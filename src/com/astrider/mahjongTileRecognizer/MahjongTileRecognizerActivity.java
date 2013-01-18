@@ -138,17 +138,13 @@ public class MahjongTileRecognizerActivity extends Activity {
 			saveImageToSDCard(bitmap);
 			
 			CaptureHelper helper = new CaptureHelper(bitmap, getBaseContext().getResources(), getPackageName());
-			String[] tiles = helper.identifyTiles();
-			double[] differences = helper.getDifferences();
-//			mOverlayView.setResult(tiles, differences);
+			String[] tiles = helper.getDetectedTileNames();
+			float[] similarities = helper.getSimilarities();
+			mOverlayView.setResult(tiles, similarities);
 			
-			for (int i = 0; i < CaptureHelper.TILE_NUM; i++) {
-//				Log.d("TAG", "tile:" + tiles[i] + " diff:" + differences[i]);
-			}
-			
-			Bitmap[] tileImages = helper.getSlicedImages();
-			for (Bitmap tileImage : tileImages) {
-				saveImageToSDCard(tileImage);
+			Bitmap[] slicedImages = helper.getSlicedImages();
+			for (Bitmap image : slicedImages) {
+				saveImageToSDCard(image);
 			}
 			
 			mCamera.startPreview();

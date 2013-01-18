@@ -12,7 +12,7 @@ import android.view.View;
 public class OverlayView extends View {
 	Paint paint = new Paint();
 	String[] tiles;
-	double[] diff;
+	float[] similarities;
 	float[][] coords;
 	
 	public OverlayView(Context context) {
@@ -24,21 +24,28 @@ public class OverlayView extends View {
 		coords = CaptureHelper.getTileCoords(getWidth(), getHeight());
 		paint.setTextAlign(Align.CENTER);
 		
+		drawBackground(canvas);
 		drawLines(canvas);
-		if(tiles != null && diff != null) {
+		if(tiles != null && similarities != null) {
 			drawResult(canvas);
 		}
 	}
 	
-	public void setResult(String[] tiles, double[] diff) {
+	public void setResult(String[] tiles, float[] similarities) {
 		this.tiles = tiles;
-		this.diff = diff;
+		this.similarities = similarities;
 		invalidate();
 	}
 	
 	private void drawBackground(Canvas canvas) {
 		paint.setColor(Color.BLACK);
 		canvas.drawRect(0, coords[0][3] + 1, getWidth(), getHeight(), paint);
+		
+		paint.setColor(Color.WHITE);
+		paint.setTextSize(30.0f);
+		
+		canvas.drawText("赤い枠線に牌が収まるように調整して下さい。", getWidth() / 2, getHeight() - 10, paint);
+		canvas.drawText("長押しでオートフォーカス、離して撮影", getWidth() / 2, getHeight() - 40, paint);
 	}
 	
 	private void drawLines(Canvas canvas) {
@@ -80,12 +87,12 @@ public class OverlayView extends View {
 		for (int i = 0; i < tiles.length; i++) {
 			float x = coords[i][0] + unitSize[0] / 2;
 			float y = coords[i][3] + 20.0f;
+			canvas.drawText(tiles[i], x, y, paint);
 			
 			// round up
-			BigDecimal bd = new BigDecimal(diff[i]);
+			BigDecimal bd = new BigDecimal(similarities[i]);
 			BigDecimal rounded = bd.setScale(1, BigDecimal.ROUND_HALF_UP);
 			
-			canvas.drawText(tiles[i], x, y, paint);
 			canvas.drawText(String.valueOf(rounded.doubleValue()), x, y + 20, paint);
 		}
 		invalidate();
