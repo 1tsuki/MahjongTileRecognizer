@@ -34,16 +34,18 @@ public class CaptureHelper {
 	String packageName;
 	HashMap<String, Bitmap> templates = new HashMap<String, Bitmap>();
 	
-	
 	FeatureDetector detector = FeatureDetector.create(FeatureDetector.ORB);
 	DescriptorExtractor extractor = DescriptorExtractor.create(DescriptorExtractor.ORB);
-	DescriptorMatcher matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+	DescriptorMatcher rMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+	DescriptorMatcher gMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+	DescriptorMatcher bMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
 	
 	Bitmap[] slicedImages = new Bitmap[TILE_NUM];
 	int[] detectedTileIds = new int[TILE_NUM];
 	String[] detectedTileNames = new String[TILE_NUM];
 	float[] similarities = new float[TILE_NUM];
 	
+	// constructor and initializers
 	public CaptureHelper(Bitmap sourceImage, Resources res, String packageName) {
 		this.res = res;
 		this.packageName = packageName;
@@ -67,14 +69,29 @@ public class CaptureHelper {
 	}
 	
 	private void loadTemplates() {
-		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9,
-					R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,
-					R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
-					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
+		int[] rIds = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
+					R.drawable.p6, R.drawable.p7, 
+					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j6};
+		
+		int[] gIds = {R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
+					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, };
+		
+		int[] bIds = {R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p8, R.drawable.p9,
+					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, };
 		
 		// array to contain descriptors
-		List<Mat> descriptors = new ArrayList<Mat>();
+		List<Mat> rDescriptors = getDescriptors(rIds);
+		List<Mat> gDescriptors = getDescriptors(gIds);
+		List<Mat> bDescriptors = getDescriptors(bIds);
 		
+		// add descriptors to matcher
+		rMatcher.add(rDescriptors);
+		gMatcher.add(gDescriptors);
+		bMatcher.add(bDescriptors);
+	}
+	
+	private List<Mat> getDescriptors(int[] ids) {
+		List<Mat> descriptors = new ArrayList<Mat>();
 		for (int i=0; i<ids.length; i++) {
 			Bitmap src = BitmapFactory.decodeResource(res, ids[i]);
 			
@@ -95,14 +112,37 @@ public class CaptureHelper {
 			src = null;
 		}
 		
-		// add descriptors to matcher
-		matcher.add(descriptors);
+		return descriptors;
 	}
 	
 	private void identifyTiles() {
 		for (int i=0; i<slicedImages.length; i++) {
 			// load next sliced tile image
 			Bitmap target = slicedImages[i];
+			int mainColor = getMainColor(target);
+			
+			DescriptorMatcher matcher = null; 
+			switch (mainColor) {
+				case Color.RED:
+					matcher = rMatcher;
+					Log.d("TAG", "red");
+					break;
+					
+				case Color.GREEN:
+					matcher = gMatcher;
+					Log.d("TAG", "green");
+					break;
+					
+				case Color.BLUE:
+					matcher = bMatcher;
+					Log.d("TAG", "blue");
+					break;
+	
+				default:
+					Log.d("TAG", "fail");
+					break;
+			}
+			
 			Mat descriptors = new Mat();
 			MatOfKeyPoint keypoint = new MatOfKeyPoint();
 			
@@ -127,7 +167,6 @@ public class CaptureHelper {
 			
 			// do vote
 			List<DMatch> myList = matches.toList();
-			Log.d("TAG", "match: " + String.valueOf(myList.size()));
 			Iterator<DMatch> itr = myList.iterator(); 
 			while(itr.hasNext()) 
 			{
@@ -153,43 +192,18 @@ public class CaptureHelper {
 			float similarity = 0;
 			if(maxImageId > 0) {
 				similarity = (float)maxVotes/trainDescs.get(maxImageId).rows()*100;
-				Log.d("TAG", "Similarity: " + String.valueOf(similarity));
 				if(similarity < 5) {
 					maxImageId = -1;
 				}
 			}
 			
-			
-			Log.d("TAG", String.valueOf(maxImageId));
-			detectedTileIds[i] = maxImageId;
-			detectedTileNames[i] = idToName(maxImageId);
+			detectedTileIds[i] = convertId(maxImageId, mainColor);
+			detectedTileNames[i] = idToName(detectedTileIds[i]);
 			similarities[i] = similarity;
 		}
 	}
-	
-	public void oldMedthod() {
-//		// prepare variables
-//		double tmpVal = 0;
-//		double minDiff = 100;
-//		String tileType = "";
-		
-		// compare target with each templates
-//		for (Entry<String, Bitmap> entry : templates.entrySet()) {
-//			tmpVal = compareImage(entry.getValue(), target);
-//			
-//			if(tmpVal < minDiff) {
-//				minDiff = tmpVal;
-//				tileType = entry.getKey();
-//			}
-//		}
-//		
-//		detectedTiles[i] = tileType;
-//		difference[i] = minDiff;
-//	}
-	
-//	return detectedTiles;
-	}
 
+	// getters
 	public Bitmap[] getSlicedImages() {
 		return slicedImages;
 	}
@@ -206,6 +220,7 @@ public class CaptureHelper {
 		return detectedTileIds;
 	}
 	
+	// static methods
 	public static Bitmap convertResolution(Bitmap src) {
 		// check current resolution
 		int srcWidth = src.getWidth();
@@ -226,7 +241,7 @@ public class CaptureHelper {
 		return dst;
 	}
 
-	public static Bitmap effectBinarization( Bitmap bitmap ){
+	public static Bitmap binarization( Bitmap bitmap ){
 		if( bitmap == null ){
 			return bitmap;
 		}
@@ -268,50 +283,6 @@ public class CaptureHelper {
     	return bitmap;
 	}
 	
-	private double compareImage(Bitmap src, Bitmap target) {
-		// check and convert resolution
-		src = convertResolution(src);
-		target = convertResolution(target);
-		
-		// get pixels
-		int[] srcPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
-		src.getPixels(srcPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-
-		int[] targetPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
-		target.getPixels(targetPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-		
-		// calculate diff
-		int srcColor = 0;
-		int targetColor = 0;
-		int rDiff = 0;
-		int gDiff = 0;
-		int bDiff = 0;
-		int rDiffSum = 0;
-		int gDiffSum = 0;
-		int bDiffSum = 0;
-		
-		for (int x = 0; x < DEFAULT_WIDTH; x++) {
-			for (int y = 0; y < DEFAULT_HEIGHT; y++) {
-				srcColor = srcPixels[x + y*DEFAULT_WIDTH];
-				targetColor = targetPixels[x + y*DEFAULT_WIDTH];
-				
-				rDiff = Color.red(srcColor) - Color.red(targetColor);
-				gDiff = Color.green(srcColor) - Color.green(targetColor);
-				bDiff = Color.blue(srcColor) - Color.blue(targetColor);
-				
-				rDiffSum += Math.pow(rDiff, 2);
-				rDiffSum += Math.pow(gDiff, 2);
-				rDiffSum += Math.pow(bDiff, 2);
-			}
-		}
-		
-		double maxDiff = Math.sqrt(DEFAULT_WIDTH * DEFAULT_HEIGHT * Math.pow(255, 2));
-		double denominator = 3 * maxDiff;
-		double numerator = Math.sqrt(rDiffSum) + Math.sqrt(gDiffSum) + Math.sqrt(bDiffSum);
-		
-		return numerator / denominator * 100;
-	}
-
 	public static String idToName(int id) {
 		if(id == -1) return "”’";
 		
@@ -363,5 +334,145 @@ public class CaptureHelper {
 		unitSize[1] = unitHeight;
 		
 		return unitSize;
+	}
+
+	// private methods
+	private int convertId(int srcId, int mainColor) {
+		if(srcId == -1) {
+			return srcId;
+		}
+		
+		int id = -1;
+		if(mainColor == Color.RED) {
+			if(srcId < 9) {
+				id = srcId;
+			} else if(srcId < 11) {
+				id = srcId + 5;
+			} else if(srcId < 16){
+				id = srcId + 16;
+			} else {
+				id = srcId + 17;
+			}
+		}
+		
+		if(mainColor == Color.GREEN) {
+			if(srcId < 9) {
+				id = srcId + 9;
+			} else {
+				id = srcId + 18;
+			}
+		}
+		
+		if(mainColor == Color.BLUE) {
+			if(srcId < 7) {
+				id = srcId + 18;
+			} else {
+				id = srcId + 20;
+			}
+		}
+		
+		return id;
+	}
+	
+	private int getMainColor(Bitmap bitmap) {
+		int height   = bitmap.getHeight( );
+		int width    = bitmap.getWidth( );
+		int[] pixels = new int[( width * height )];
+		bitmap.getPixels( pixels, 0, width, 0, 0, width, height );
+
+		int rsum = 0;
+		int gsum = 0;
+		int bsum = 0;
+		for( int YY = 0; YY < width; ++YY ){
+			for( int XX = 0; XX < height; ++XX ){
+				int bitmapColor = pixels[( YY + XX * width )];
+        		rsum += Color.red( bitmapColor );
+        		gsum += Color.green( bitmapColor );
+        		bsum += Color.blue( bitmapColor );
+      		}
+    	}
+		
+		int retval = 0;
+		Log.d("TAG", "each" + String.valueOf(rsum) + " " + String.valueOf(gsum) + " " + String.valueOf(bsum));
+		if(rsum >= gsum && rsum >= bsum) {
+			retval = Color.RED;
+		}
+		
+		if(gsum >= rsum && gsum >= bsum) {
+			retval = Color.GREEN;
+		}
+		
+		if(bsum >= rsum && bsum >= gsum) {
+			retval = Color.BLUE;
+		}
+		
+		return Color.RED;
+	}
+	
+	private double compareImage(Bitmap src, Bitmap target) {
+		// check and convert resolution
+		src = convertResolution(src);
+		target = convertResolution(target);
+		
+		// get pixels
+		int[] srcPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
+		src.getPixels(srcPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+
+		int[] targetPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
+		target.getPixels(targetPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+		
+		// calculate diff
+		int srcColor = 0;
+		int targetColor = 0;
+		int rDiff = 0;
+		int gDiff = 0;
+		int bDiff = 0;
+		int rDiffSum = 0;
+		int gDiffSum = 0;
+		int bDiffSum = 0;
+		
+		for (int x = 0; x < DEFAULT_WIDTH; x++) {
+			for (int y = 0; y < DEFAULT_HEIGHT; y++) {
+				srcColor = srcPixels[x + y*DEFAULT_WIDTH];
+				targetColor = targetPixels[x + y*DEFAULT_WIDTH];
+				
+				rDiff = Color.red(srcColor) - Color.red(targetColor);
+				gDiff = Color.green(srcColor) - Color.green(targetColor);
+				bDiff = Color.blue(srcColor) - Color.blue(targetColor);
+				
+				rDiffSum += Math.pow(rDiff, 2);
+				rDiffSum += Math.pow(gDiff, 2);
+				rDiffSum += Math.pow(bDiff, 2);
+			}
+		}
+		
+		double maxDiff = Math.sqrt(DEFAULT_WIDTH * DEFAULT_HEIGHT * Math.pow(255, 2));
+		double denominator = 3 * maxDiff;
+		double numerator = Math.sqrt(rDiffSum) + Math.sqrt(gDiffSum) + Math.sqrt(bDiffSum);
+		
+		return numerator / denominator * 100;
+	}
+	
+	private void oldMedthod() {
+//		// prepare variables
+//		double tmpVal = 0;
+//		double minDiff = 100;
+//		String tileType = "";
+		
+		// compare target with each templates
+//		for (Entry<String, Bitmap> entry : templates.entrySet()) {
+//			tmpVal = compareImage(entry.getValue(), target);
+//			
+//			if(tmpVal < minDiff) {
+//				minDiff = tmpVal;
+//				tileType = entry.getKey();
+//			}
+//		}
+//		
+//		detectedTiles[i] = tileType;
+//		difference[i] = minDiff;
+//	}
+	
+//	return detectedTiles;
 	}
 }
