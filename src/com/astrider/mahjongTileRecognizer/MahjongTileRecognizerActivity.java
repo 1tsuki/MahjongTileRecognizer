@@ -3,6 +3,7 @@ package com.astrider.mahjongTileRecognizer;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
@@ -12,6 +13,7 @@ import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.CompressFormat;
@@ -22,6 +24,8 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.provider.MediaStore.Images;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -32,13 +36,23 @@ import android.widget.FrameLayout;
 import android.widget.Toast;
 
 public class MahjongTileRecognizerActivity extends Activity {
-	private static final String TAG = "Mahjong::Activity";
-	
+	private final static String TAG = "Mahjong::Activity";
 	private final static String SAVE_FOLDER_NAME = "/mahjong/";
+	private final static int REQUEST_GALLERY = 0;
+	
 	private FrameLayout mFrameLayout;
 	private SurfaceView mCameraView;
 	private OverlayView mOverlayView;	
 	private Camera mCamera;
+	
+	private MenuItem mItemEuclidean;
+	private MenuItem mItemORB;
+	private MenuItem mItemORBAdvanced;
+	private MenuItem mItemLoadGallery;
+	
+	private CaptureHelper helper;
+	
+	boolean isCameraPaused = false;
 	
 	private BaseLoaderCallback mOpenCVCallBack = new BaseLoaderCallback(this) {
 	   @Override
@@ -86,6 +100,31 @@ public class MahjongTileRecognizerActivity extends Activity {
         mOverlayView = new OverlayView(this);
     }
 	
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		mItemEuclidean = menu.add("ユークリッド距離");
+		mItemORB = menu.add("ORB検出器");
+		mItemORBAdvanced = menu.add("拡張ORB検出器");
+		mItemLoadGallery = menu.add("ギャラリーから検出");
+		return true;
+	}
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item == mItemEuclidean) {
+            helper.setMethod(CaptureHelper.METHOD_EUCLIDEANDISTANCE);
+        } else if (item == mItemORB) {
+            helper.setMethod(CaptureHelper.METHOD_ORB);
+        } else if (item == mItemORBAdvanced) {
+            helper.setMethod(CaptureHelper.METHOD_ORB_ADVANCED);
+        } else if (item == mItemLoadGallery) {
+        	loadFromGallery();
+        }
+        
+        mOverlayView.setCurrentMethod(helper.getCurrentMethod());
+        return true;
+    }
+	
 	private void onOpenCVLoad() {
         // abort if camera not detected
     	if(!isCameraAvailable()) {
@@ -97,6 +136,10 @@ public class MahjongTileRecognizerActivity extends Activity {
     		finish();
     	}
     	
+    	// initialize helper
+    	helper = new CaptureHelper(getResources(), getPackageName(), CaptureHelper.METHOD_ORB);
+    	mOverlayView.setCurrentMethod(helper.getCurrentMethod());
+    	
 		// setup cameraView
         SurfaceHolder holder = mCameraView.getHolder();
         holder.addCallback(mSurfaceHolderCallback);
@@ -107,12 +150,20 @@ public class MahjongTileRecognizerActivity extends Activity {
         mOverlayView.setOnTouchListener(new OnTouchListener() {
 			public boolean onTouch(View v, MotionEvent event) {
 				if(event.getAction() == MotionEvent.ACTION_DOWN) {
-					autoFocus();
+					if(!isCameraPaused) {
+						autoFocus();
+					}
 				}
 				
 				if(event.getAction() == MotionEvent.ACTION_UP) {
-					takePicture();
+					if(!isCameraPaused) {
+						takePicture();
+					} else {
+						isCameraPaused = false;
+						mCamera.startPreview();
+					}
 				}
+				
 				return true;
 			}
 		});
@@ -125,10 +176,12 @@ public class MahjongTileRecognizerActivity extends Activity {
 	private Camera.PictureCallback mPictureCallback = new Camera.PictureCallback () {
 		public void onPictureTaken(byte[] data, Camera camera) {
 			mCamera.stopPreview();
+			isCameraPaused = true;
 			
 			// restart if capture failed
 			if(data == null) {
 				Log.d("TAG", "failed to get data");
+				isCameraPaused = false;
 				mCamera.startPreview();
 				return;
 			}
@@ -136,20 +189,27 @@ public class MahjongTileRecognizerActivity extends Activity {
 			// decode picture and do things
 			Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
 			saveImageToSDCard(bitmap);
-			
-			CaptureHelper helper = new CaptureHelper(bitmap, getBaseContext().getResources(), getPackageName());
-			String[] tiles = helper.getDetectedTileNames();
-			float[] similarities = helper.getSimilarities();
-			mOverlayView.setResult(tiles, similarities);
-			
-			Bitmap[] slicedImages = helper.getSlicedImages();
-			for (Bitmap image : slicedImages) {
-				saveImageToSDCard(image);
-			}
-			
-			mCamera.startPreview();
+			onPictureLoaded(bitmap);		
 		}
 	};
+	
+	private void onPictureLoaded(Bitmap bitmap) {
+		helper.setSourceImage(bitmap);
+		try {
+			helper.identifyTiles();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		String[] tiles = helper.getDetectedTileNames();
+		float[] similarities = helper.getSimilarities();
+		
+		for (String tile : tiles) {
+			Log.d("TAG", tile);
+		}
+		
+		mOverlayView.setResult(tiles, similarities);
+	}
 
 	private SurfaceHolder.Callback mSurfaceHolderCallback = new SurfaceHolder.Callback() {
 		public void surfaceCreated(SurfaceHolder holder) {
@@ -163,10 +223,12 @@ public class MahjongTileRecognizerActivity extends Activity {
 		
 		public void surfaceChanged(SurfaceHolder holder,
 				int format, int width, int height) {
+			isCameraPaused = false;
 			mCamera.startPreview();
 		}
 		
 		public void surfaceDestroyed(SurfaceHolder holder) {
+			isCameraPaused = true;
 			mCamera.stopPreview();
 			mCamera.release();
 			mCamera = null;
@@ -195,9 +257,35 @@ public class MahjongTileRecognizerActivity extends Activity {
 		t.start();
 	}
 	
+	private void loadFromGallery() {
+		mCamera.stopPreview();
+		
+		Intent intent = new Intent();
+		intent.setType("image/*");
+		intent.setAction(Intent.ACTION_GET_CONTENT);
+		startActivityForResult(intent, REQUEST_GALLERY);
+	}
+	
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		if(requestCode == REQUEST_GALLERY && resultCode == RESULT_OK) {
+			try {
+				InputStream in = getContentResolver().openInputStream(data.getData());
+				Bitmap bitmap = BitmapFactory.decodeStream(in);
+				
+				onPictureLoaded(bitmap);
+			} catch (Exception e) {
+				
+			}
+			isCameraPaused = false;
+			mCamera.startPreview();
+		}
+	}
+	
 	private void saveImageToSDCard(Bitmap bitmap) {
 		if(!isSDCardMounted()) {
 			Log.d("TAG", "SDCard is not mounted");
+			isCameraPaused = false;
 			mCamera.startPreview();
 			return;
 		}

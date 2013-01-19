@@ -1,7 +1,6 @@
 package com.astrider.mahjongTileRecognizer;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -39,15 +38,15 @@ public class CaptureHelper {
 	boolean isSourceLoaded = false;
 	int methodType = METHOD_ORB_ADVANCED;
 	
-	HashMap<String, Bitmap> templates = new HashMap<String, Bitmap>();
+	Bitmap[] templateImages;
+	DescriptorMatcher matcher;
+	DescriptorMatcher rMatcher;
+	DescriptorMatcher gMatcher;
+	DescriptorMatcher bMatcher;
 	FeatureDetector detector = FeatureDetector.create(FeatureDetector.ORB);
 	DescriptorExtractor extractor = DescriptorExtractor.create(DescriptorExtractor.ORB);
-	DescriptorMatcher matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-	DescriptorMatcher rMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-	DescriptorMatcher gMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-	DescriptorMatcher bMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
 	
-	Bitmap[] slicedImages = new Bitmap[TILE_NUM];
+	Bitmap[] slicedImages = null;
 	int[] detectedTileIds = new int[TILE_NUM];
 	String[] detectedTileNames = new String[TILE_NUM];
 	float[] similarities = new float[TILE_NUM];
@@ -70,34 +69,7 @@ public class CaptureHelper {
 		loadTemplates();
 	}
 	
-	// getters
-	public Bitmap[] getSlicedImages() {
-		return slicedImages;
-	}
-
-	public float[] getSimilarities() {
-		return similarities;
-	}
-	
-	public String[] getDetectedTileNames() {
-		return detectedTileNames;
-	}
-	
-	public int[] getDetectedTileIds() {
-		return detectedTileIds;
-	}
-	
-	// setters
-	public void setSourceImage(Bitmap sourceImage) {
-		sliceImage(sourceImage);
-	}
-	
-	public void setMethod(int methodType) {
-		this.methodType = methodType;
-		loadTemplates();
-	}
-	
-	// static methods
+	// static methods (tools)
 	public static Bitmap convertResolution(Bitmap src) {
 		// check current resolution
 		int srcWidth = src.getWidth();
@@ -153,6 +125,45 @@ public class CaptureHelper {
         		bb = X;
 
         		pixels[( YY + XX * width )] = Color.rgb( rr, gg, bb );
+      		}
+    	}
+
+    	bitmap.setPixels( pixels, 0, width, 0, 0, width, height );
+    	return bitmap;
+	}
+	
+	public static Bitmap changeContrast(Bitmap bitmap, double effectLevel) {
+		if( bitmap == null ){
+			return bitmap;
+		}
+
+		if( bitmap.isMutable( ) != true ){
+			bitmap = bitmap.copy( Bitmap.Config.ARGB_8888, true );
+		}
+
+		int height   = bitmap.getHeight( );
+		int width    = bitmap.getWidth( );
+		int[] pixels = new int[( width * height )];
+		bitmap.getPixels( pixels, 0, width, 0, 0, width, height );
+
+		for( int YY = 0; YY < width; ++YY ){
+			for( int XX = 0; XX < height; ++XX ){
+				int bitmapColor = pixels[( YY + XX * width )];
+				int[] color = {Color.red(bitmapColor), Color.green(bitmapColor), Color.blue(bitmapColor)};
+				
+				for (int i = 0; i < color.length; i++) {
+					int tmpColor = color[i];
+					
+					tmpColor = (int) ((tmpColor - 128) * effectLevel + tmpColor);
+					if(tmpColor < 0) {
+						tmpColor = 0;
+					} else if (tmpColor > 255) {
+						tmpColor = 255;
+					}
+					color[i] = tmpColor;
+				}
+
+        		pixels[( YY + XX * width )] = Color.rgb( color[0], color[1], color[2] );
       		}
     	}
 
@@ -237,14 +248,32 @@ public class CaptureHelper {
 				break;
 		}
 		
+		// clear source images
+		for (Bitmap image : slicedImages) {
+			image.recycle();
+			image = null;
+		}
+		
 		return detectedTileNames;
 	}
 	
 	// private methods
 	private void loadTemplates() {
+		// clear resources
+		matcher = null;
+		rMatcher = null;
+		gMatcher = null;
+		bMatcher = null;
+		if(templateImages != null) {
+			for (int i = 0; i < templateImages.length; i++) {
+				templateImages[i].recycle();
+				templateImages[i] = null;
+			}
+		}
+		
 		switch (methodType) {
 			case METHOD_EUCLIDEANDISTANCE:
-				setupEuclideanDistanceTemplates();
+				setupEuclidianDistanceTemplates();
 				break;
 				
 			case METHOD_ORB:
@@ -262,6 +291,8 @@ public class CaptureHelper {
 	}
 	
 	private void sliceImage(Bitmap sourceImage) {
+		slicedImages = new Bitmap[TILE_NUM];
+		
 		float[][] coords = getTileCoords(sourceImage.getWidth(), sourceImage.getHeight());
 		
 		for (int i = 0; i < coords.length; i++) {
@@ -312,131 +343,52 @@ public class CaptureHelper {
 		return id;
 	}
 	
-	private int[] getRGBAverage() {
-		int[] sum = new int[3];
-		for (int i = 0; i < sum.length; i++) {
-			sum[i] = 0;
-		}
-		
-		for (Bitmap bitmap : slicedImages) {
-			int[] bitmapSum = getRGBSum(bitmap);
-			for (int i = 0; i < bitmapSum.length; i++) {
-				sum[i] = bitmapSum[i];
-			}
-		}
-		
-		int[] avg = new int[3];
-		for (int i = 0; i < avg.length; i++) {
-			avg[i] = sum[i] / slicedImages.length;
-		}
-		
-		return avg;
-	}
-	
-	private int[] getRGBSum(Bitmap bitmap) {
-		int height   = bitmap.getHeight( );
-		int width    = bitmap.getWidth( );
-		int[] pixels = new int[( width * height )];
-		bitmap.getPixels( pixels, 0, width, 0, 0, width, height );
-
-		int[] sum = new int[3];
-		for( int YY = 0; YY < width; ++YY ){
-			for( int XX = 0; XX < height; ++XX ){
-				int bitmapColor = pixels[( YY + XX * width )];
-        		sum[0] += Color.red( bitmapColor );
-        		sum[1] += Color.green( bitmapColor );
-        		sum[2] += Color.blue( bitmapColor );
-      		}
-    	}
-		
-		return sum;
-	}
-	
-	private int getMainColor(Bitmap bitmap, int[] average) {
-		int[] colorSum = getRGBSum(bitmap);
-		
-		int tmpVal = 0;
-		int maxKey = -1;
-		for (int i = 0; i < colorSum.length; i++) {
-			colorSum[i] -= average[i];
-			if (tmpVal > colorSum[i]) {
-				tmpVal = colorSum[i];
-				maxKey = i;
-			}
-		}
-		
-		int[] colorArray = {Color.RED, Color.GREEN, Color.BLUE};
-		return colorArray[maxKey];
-	}
-	
-	private double compareImage(Bitmap src, Bitmap target) {
-		// check and convert resolution
-		src = convertResolution(src);
-		target = convertResolution(target);
-		
-		// get pixels
-		int[] srcPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
-		src.getPixels(srcPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-
-		int[] targetPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
-		target.getPixels(targetPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-		
-		// calculate diff
-		int srcColor = 0;
-		int targetColor = 0;
-		int rDiff = 0;
-		int gDiff = 0;
-		int bDiff = 0;
-		int rDiffSum = 0;
-		int gDiffSum = 0;
-		int bDiffSum = 0;
-		
-		for (int x = 0; x < DEFAULT_WIDTH; x++) {
-			for (int y = 0; y < DEFAULT_HEIGHT; y++) {
-				srcColor = srcPixels[x + y*DEFAULT_WIDTH];
-				targetColor = targetPixels[x + y*DEFAULT_WIDTH];
-				
-				rDiff = Color.red(srcColor) - Color.red(targetColor);
-				gDiff = Color.green(srcColor) - Color.green(targetColor);
-				bDiff = Color.blue(srcColor) - Color.blue(targetColor);
-				
-				rDiffSum += Math.pow(rDiff, 2);
-				rDiffSum += Math.pow(gDiff, 2);
-				rDiffSum += Math.pow(bDiff, 2);
-			}
-		}
-		
-		double maxDiff = Math.sqrt(DEFAULT_WIDTH * DEFAULT_HEIGHT * Math.pow(255, 2));
-		double denominator = 3 * maxDiff;
-		double numerator = Math.sqrt(rDiffSum) + Math.sqrt(gDiffSum) + Math.sqrt(bDiffSum);
-		
-		return numerator / denominator * 100;
-	}
-	
+	// helper methods for loading resource
 	private void setupEuclidianDistanceTemplates() {
+		Log.d("TAG", "setupEuclidianDistanceTemplates");
+		int[] ids = {R.drawable.euc_w1, R.drawable.euc_w2, R.drawable.euc_w3, R.drawable.euc_w4, R.drawable.euc_w5, R.drawable.euc_w6, R.drawable.euc_w7, R.drawable.euc_w8, R.drawable.euc_w9,
+					R.drawable.euc_p1, R.drawable.euc_p2, R.drawable.euc_p3, R.drawable.euc_p4, R.drawable.euc_p5, R.drawable.euc_p6, R.drawable.euc_p7, R.drawable.euc_p8, R.drawable.euc_p9,
+					R.drawable.euc_s1, R.drawable.euc_s2, R.drawable.euc_s3, R.drawable.euc_s4, R.drawable.euc_s5, R.drawable.euc_s6, R.drawable.euc_s7, R.drawable.euc_s8, R.drawable.euc_s9,
+					R.drawable.euc_j1, R.drawable.euc_j2, R.drawable.euc_j3, R.drawable.euc_j4, R.drawable.euc_j5, R.drawable.euc_j6};
+		templateImages = new Bitmap[ids.length];
 		
+		for (int i = 0; i<ids.length; i++) {
+			Bitmap src = BitmapFactory.decodeResource(res, ids[i]);
+			Bitmap converted = convertResolution(src);
+			templateImages[i] = converted;
+			
+			src.recycle();
+			src = null;
+		}
 	}
 	
 	private void setupORBMatcher() {
-		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
-					R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,  
-					R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
-					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
+		Log.d("TAG", "setupORBMatcher");
+		matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+		int[] ids = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
+					R.drawable.orb_p1, R.drawable.orb_p2, R.drawable.orb_p3, R.drawable.orb_p4, R.drawable.orb_p5, R.drawable.orb_p6, R.drawable.orb_p7, R.drawable.orb_p8, R.drawable.orb_p9,  
+					R.drawable.orb_s1, R.drawable.orb_s2, R.drawable.orb_s3, R.drawable.orb_s4, R.drawable.orb_s5, R.drawable.orb_s6, R.drawable.orb_s7, R.drawable.orb_s8, R.drawable.orb_s9,
+					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j5, R.drawable.orb_j6};
 		
 		List<Mat> descriptors = getDescriptors(ids);
 		matcher.add(descriptors);
 	}
 	
 	private void setupORBAdvancedMatchers() {
-		int[] rIds = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
-					R.drawable.p6, R.drawable.p7, 
-					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j6};
+		Log.d("TAG", "setupORBAdvancedMatcher");
+		rMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+		gMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+		bMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
 		
-		int[] gIds = {R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
-					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, };
+		int[] rIds = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
+					R.drawable.orb_p6, R.drawable.orb_p7, 
+					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j6};
 		
-		int[] bIds = {R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p8, R.drawable.p9,
-					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, };
+		int[] gIds = {R.drawable.orb_s1, R.drawable.orb_s2, R.drawable.orb_s3, R.drawable.orb_s4, R.drawable.orb_s5, R.drawable.orb_s6, R.drawable.orb_s7, R.drawable.orb_s8, R.drawable.orb_s9,
+					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j5, };
+		
+		int[] bIds = {R.drawable.orb_p1, R.drawable.orb_p2, R.drawable.orb_p3, R.drawable.orb_p4, R.drawable.orb_p5, R.drawable.orb_p8, R.drawable.orb_p9,
+					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, };
 		
 		// array to contain descriptors
 		List<Mat> rDescriptors = getDescriptors(rIds);
@@ -449,40 +401,101 @@ public class CaptureHelper {
 		bMatcher.add(bDescriptors);
 	}
 	
-	private List<Mat> getDescriptors(int[] ids) {
-		List<Mat> descriptors = new ArrayList<Mat>();
-		for (int i=0; i<ids.length; i++) {
-			Bitmap src = BitmapFactory.decodeResource(res, ids[i]);
-			
-			// convert bitmap to gray mat
-			Mat mat = new Mat();
-			MatOfKeyPoint keypoint = new MatOfKeyPoint();
-			Mat descriptor = new Mat();
-			Utils.bitmapToMat(src, mat);
-			Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
-			
-			// detect, extract and add to descriptors
-			detector.detect(mat, keypoint);
-			extractor.compute(mat, keypoint, descriptor);
-			descriptors.add(descriptor);
-			
-			// remove src from memory
-			src.recycle();
-			src = null;
-		}
-		
-		return descriptors;
-	}
-	
+	// detectors
 	private void euclideanDistanceDetection() {
+		Log.d("TAG", "Runninng euclidean Distance Detection");
+		// prepare variables
+		double tmpVal = 0;
+		double minDiff = 100;
+		int id = 0;
 		
+		// compare target with each templates
+		for (int i = 0; i < slicedImages.length; i++) {
+			Bitmap target = slicedImages[i];
+			for (int j = 0; j < templateImages.length; j++) {
+				tmpVal = getEuclideanDistance(templateImages[j], target);
+				if(tmpVal < minDiff) {
+					minDiff = tmpVal;
+					id = j;
+				}
+			}
+			
+			detectedTileIds[i] = id;
+			detectedTileNames[i] = idToName(detectedTileIds[i]);
+			similarities[i] = (float) (100 - minDiff);
+		}
 	}
 	
 	private void orbDetection() {
-		
+		Log.d("TAG", "Runninng orb Detection");
+		for (int i=0; i<slicedImages.length; i++) {
+			// load next sliced tile image
+			Bitmap target = slicedImages[i];
+			
+			Mat descriptors = new Mat();
+			MatOfKeyPoint keypoint = new MatOfKeyPoint();
+			
+			// convert bitmap to gray mat
+			Mat mat = new Mat();
+			Utils.bitmapToMat(target, mat);
+			Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
+			
+			// detect, extract target image
+			detector.detect(mat, keypoint);
+			extractor.compute(mat, keypoint, descriptors);
+			
+			// do matching
+			MatOfDMatch matches = new MatOfDMatch();
+			matcher.match(descriptors, matches);
+			
+			// initialize vote box
+			int[] votes = new int[TEMPLATE_NUM];
+			for (int j = 0; j < TEMPLATE_NUM; j++) {
+				votes[j] = 0;
+			}
+			
+			// do vote
+			List<DMatch> myList = matches.toList();
+			Iterator<DMatch> itr = myList.iterator(); 
+			while(itr.hasNext()) 
+			{
+			      DMatch element = itr.next();
+			      if(element.distance < THRESHOLD) {
+			    	  votes[element.imgIdx]++;
+			      }
+			}
+			
+			int maxImageId = -1;
+			int maxVotes = 0;
+			for (int j = 0; j < TEMPLATE_NUM; j++) {
+				if(votes[j] > maxVotes ) {
+					maxImageId = j;
+					maxVotes = votes[j];
+				}
+			}
+			
+			List<Mat> trainDescs = new ArrayList<Mat>(); 
+			trainDescs = matcher.getTrainDescriptors();
+			
+			// if similarity is under 5%, set as undetected
+			float similarity = 0;
+			if(maxImageId > 0) {
+				similarity = (float)maxVotes/trainDescs.get(maxImageId).rows()*100;
+				Log.d("TAG", "id" + String.valueOf(maxImageId) + "similarity " + String.valueOf(similarity));
+				if(similarity < 5) {
+					maxImageId = -1;
+				}
+			}
+			
+			detectedTileIds[i] = maxImageId;
+			detectedTileNames[i] = idToName(detectedTileIds[i]);
+			similarities[i] = similarity;
+		}
 	}
 	
 	private void orbAdvancedDetection() {
+		Log.d("TAG", "Runninng orb Advanced Detection");
+		
 		for (int i=0; i<slicedImages.length; i++) {
 			// load next sliced tile image
 			Bitmap target = slicedImages[i];
@@ -572,29 +585,165 @@ public class CaptureHelper {
 			similarities[i] = similarity;
 		}
 	}
-	
-	
-	
-	private void oldMedthod() {
-//		// prepare variables
-//		double tmpVal = 0;
-//		double minDiff = 100;
-//		String tileType = "";
+
+	// detect helpers
+	private double getEuclideanDistance(Bitmap src, Bitmap target) {
+		// check and convert resolution
+		src = convertResolution(src);
+		target = convertResolution(target);
 		
-		// compare target with each templates
-//		for (Entry<String, Bitmap> entry : templates.entrySet()) {
-//			tmpVal = compareImage(entry.getValue(), target);
-//			
-//			if(tmpVal < minDiff) {
-//				minDiff = tmpVal;
-//				tileType = entry.getKey();
-//			}
-//		}
-//		
-//		detectedTiles[i] = tileType;
-//		difference[i] = minDiff;
-//	}
-	
-//	return detectedTiles;
+		// get pixels
+		int[] srcPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
+		src.getPixels(srcPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+
+		int[] targetPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
+		target.getPixels(targetPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+		
+		// calculate diff
+		int srcColor = 0;
+		int targetColor = 0;
+		int rDiff = 0;
+		int gDiff = 0;
+		int bDiff = 0;
+		int rDiffSum = 0;
+		int gDiffSum = 0;
+		int bDiffSum = 0;
+		
+		for (int x = 0; x < DEFAULT_WIDTH; x++) {
+			for (int y = 0; y < DEFAULT_HEIGHT; y++) {
+				srcColor = srcPixels[x + y*DEFAULT_WIDTH];
+				targetColor = targetPixels[x + y*DEFAULT_WIDTH];
+				
+				rDiff = Color.red(srcColor) - Color.red(targetColor);
+				gDiff = Color.green(srcColor) - Color.green(targetColor);
+				bDiff = Color.blue(srcColor) - Color.blue(targetColor);
+				
+				rDiffSum += Math.pow(rDiff, 2);
+				rDiffSum += Math.pow(gDiff, 2);
+				rDiffSum += Math.pow(bDiff, 2);
+			}
+		}
+		
+		double maxDiff = Math.sqrt(DEFAULT_WIDTH * DEFAULT_HEIGHT * Math.pow(255, 2));
+		double denominator = 3 * maxDiff;
+		double numerator = Math.sqrt(rDiffSum) + Math.sqrt(gDiffSum) + Math.sqrt(bDiffSum);
+		double difference = numerator / denominator * 100;
+		
+		return difference; 
 	}
-}
+
+	private List<Mat> getDescriptors(int[] ids) {
+		List<Mat> descriptors = new ArrayList<Mat>();
+		for (int i=0; i<ids.length; i++) {
+			Bitmap src = BitmapFactory.decodeResource(res, ids[i]);
+			
+			// convert bitmap to gray mat
+			Mat mat = new Mat();
+			MatOfKeyPoint keypoint = new MatOfKeyPoint();
+			Mat descriptor = new Mat();
+			Utils.bitmapToMat(src, mat);
+			Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
+			
+			// detect, extract and add to descriptors
+			detector.detect(mat, keypoint);
+			extractor.compute(mat, keypoint, descriptor);
+			descriptors.add(descriptor);
+			
+			// remove src from memory
+			src.recycle();
+			src = null;
+		}
+		
+		return descriptors;
+	}
+
+	private int[] getRGBAverage() {
+		int[] sum = new int[3];
+		for (int i = 0; i < sum.length; i++) {
+			sum[i] = 0;
+		}
+		
+		for (Bitmap bitmap : slicedImages) {
+			int[] bitmapSum = getRGBSum(bitmap);
+			for (int i = 0; i < bitmapSum.length; i++) {
+				sum[i] = bitmapSum[i];
+			}
+		}
+		
+		int[] avg = new int[3];
+		for (int i = 0; i < avg.length; i++) {
+			avg[i] = sum[i] / slicedImages.length;
+		}
+		
+		return avg;
+	}
+	
+	private int[] getRGBSum(Bitmap bitmap) {
+		int height   = bitmap.getHeight( );
+		int width    = bitmap.getWidth( );
+		int[] pixels = new int[( width * height )];
+		bitmap.getPixels( pixels, 0, width, 0, 0, width, height );
+
+		int[] sum = new int[3];
+		for( int YY = 0; YY < width; ++YY ){
+			for( int XX = 0; XX < height; ++XX ){
+				int bitmapColor = pixels[( YY + XX * width )];
+        		sum[0] += Color.red( bitmapColor );
+        		sum[1] += Color.green( bitmapColor );
+        		sum[2] += Color.blue( bitmapColor );
+      		}
+    	}
+		
+		return sum;
+	}
+	
+	private int getMainColor(Bitmap bitmap, int[] average) {
+		int[] colorSum = getRGBSum(bitmap);
+		
+		int tmpVal = 0;
+		int maxKey = -1;
+		for (int i = 0; i < colorSum.length; i++) {
+			colorSum[i] -= average[i];
+			if (tmpVal > colorSum[i]) {
+				tmpVal = colorSum[i];
+				maxKey = i;
+			}
+		}
+		
+		int[] colorArray = {Color.RED, Color.GREEN, Color.BLUE};
+		return colorArray[maxKey];
+	}
+	
+	// getters
+	public String getCurrentMethod() {
+		String[] methods = {"ユークリッド距離", "ORB検出器", "拡張ORB検出器"};
+		return methods[methodType];
+	}
+	
+	public Bitmap[] getSlicedImages() {
+		return slicedImages;
+	}
+
+	public float[] getSimilarities() {
+		return similarities;
+	}
+	
+	public String[] getDetectedTileNames() {
+		return detectedTileNames;
+	}
+	
+	public int[] getDetectedTileIds() {
+		return detectedTileIds;
+	}
+	
+	// setters
+	public void setSourceImage(Bitmap sourceImage) {
+		isSourceLoaded = true;
+		sliceImage(sourceImage);
+	}
+	
+	public void setMethod(int methodType) {
+		this.methodType = methodType;
+		loadTemplates();
+	}
+	}
