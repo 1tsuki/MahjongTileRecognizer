@@ -10,9 +10,12 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfDMatch;
 import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
+import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.opencv.features2d.DMatch;
 import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
@@ -78,32 +81,109 @@ public class CaptureHelper {
 	}
 	
 	// static methods (tools)
-	public static Bitmap effectDrawBoundingRect(Bitmap src) {
-		Mat mat = new Mat();
+	public static Bitmap effectDrawEdges(Bitmap bitmap) {		
+		Mat src = new Mat();
+		Mat gray = new Mat();
+		Mat dst = new Mat();
+		Utils.bitmapToMat(bitmap, src);
+
+		int min_x_thresh = (int) (src.rows() * 0.1);
+		int max_x_thresh = (int) (src.rows() * 0.9);
+		int min_y_thresh = (int) (src.cols() * 0.1);
+		int max_y_thresh = (int) (src.cols() * 0.9);
+		
+		Imgproc.cvtColor(src , gray, Imgproc.COLOR_RGB2GRAY); 
+		Imgproc.threshold(gray, dst, 0, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
+		Mat hierarchy = new Mat();
+		List<MatOfPoint> contours =new ArrayList<MatOfPoint>(100);
+		Imgproc.findContours(dst, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_NONE);
+		Imgproc.cvtColor(gray , gray, Imgproc.COLOR_GRAY2BGRA,4);
+		
+//		Imgproc.drawContours(gray, contours, -1, new Scalar(255, 0, 0), 1);
+		if(contours.size() > 0) {
+			Mat first = contours.get(0);
+			double min_x = first.get(0, 0)[0];
+			double max_x = first.get(0, 0)[0];
+			double min_y = first.get(0, 0)[1];
+			double max_y = first.get(0, 0)[1];
+			double x, y, tmp[];
+			for (int i = 0; i < contours.size(); i++) {
+				Mat m = contours.get(i);
+
+				if(m.rows() > 80) {
+					for (int j = 0; j < m.rows(); j++) {
+						tmp = m.get(j, 0);
+						x = tmp[0];
+						y = tmp[1];
+						Log.d("TAG", String.valueOf(x) + " " + String.valueOf(y));
+						
+						if(min_x_thresh < x && x < min_x) {
+							min_x = x;
+						}
+						if(max_x < x && x < max_x_thresh ) {
+							max_x = x;
+						}
+						if(min_y_thresh < y && y < min_y) {
+							min_y = y;
+						}
+						if(max_y < y && y < max_y_thresh) {
+							max_y = y;
+						}
+					}
+				}
+			}
+			
+			Log.d("TAG", String.valueOf(min_x) + " " + String.valueOf(max_x) + " " + String.valueOf(max_y) + " " + String.valueOf(min_y));
+			Mat sub = src.submat(new Rect(new Point(min_x, min_y), new Point(max_x, max_y)));
+			Utils.matToBitmap(sub, bitmap);
+			
+		}
+		
+
+		return bitmap;
+	}
+	
+	public static Bitmap effectChopBoundingRect(Bitmap bitmap) {
+		Mat src = new Mat();
 		MatOfKeyPoint keyPoints = new MatOfKeyPoint();
 		
-		Utils.bitmapToMat(src, mat);
-//		FeatureDetector detector = FeatureDetector.create(FeatureDetector.FAST);
+		Utils.bitmapToMat(bitmap, src);
 		FeatureDetector detector = FeatureDetector.create(FeatureDetector.ORB);
-		Log.d("TAG", "Running detection");
-		detector.detect(mat, keyPoints);
-		Log.d("TAG", "Done detection");
+		detector.detect(src, keyPoints);
 		
 		KeyPoint[] keyPointsArray = keyPoints.toArray();
 		if(keyPointsArray.length > 0) {
 			List<Point> pointList = new ArrayList<Point>();
-			MatOfPoint points = new MatOfPoint();
+			MatOfPoint2f points = new MatOfPoint2f();
 			for (int i = 0; i < keyPointsArray.length; i++) {
 				pointList.add(keyPointsArray[i].pt);
 			}
 			points.fromList(pointList);
 			 
-			Rect bRect = Imgproc.boundingRect(points);
-			Core.rectangle(mat, bRect.tl(), bRect.br(), new Scalar(100, 100, 200), 2);
-			Utils.matToBitmap(mat, src);
+			// detect bounding rect
+			RotatedRect rect = Imgproc.minAreaRect(points);
+			
+			// extract rectangle
+			Mat M = new Mat();
+			Mat rotated = new Mat();
+			Mat cropped = new Mat();
+			double angle = rect.angle;
+			Size rect_size = rect.size;
+			
+			if( rect.angle < -45.) {
+				angle += 90.0;
+				double tmp = rect_size.width;
+				rect_size.width = rect_size.height;
+				rect_size.height = tmp;
+			}
+			M = Imgproc.getRotationMatrix2D(rect.center, angle, 1.0);
+			Imgproc.warpAffine(src, rotated, M, src.size(), Imgproc.INTER_CUBIC);
+			Imgproc.getRectSubPix(rotated, rect_size, rect.center, cropped);
+			
+			Utils.matToBitmap(cropped, bitmap);
 		}
 		
-		return src;
+		return bitmap;
 	}
 	
 	public static Bitmap effectConvertResolution(Bitmap src) {
@@ -124,48 +204,6 @@ public class CaptureHelper {
 		Bitmap dst = Bitmap.createBitmap(src, 0, 0, srcWidth, srcHeight, matrix, true);
 		
 		return dst;
-	}
-
-	public static Bitmap effectBinarization( Bitmap bitmap ){
-		if( bitmap == null ){
-			return bitmap;
-		}
-
-		if( bitmap.isMutable( ) != true ){
-			bitmap = bitmap.copy( Bitmap.Config.ARGB_8888, true );
-		}
-
-		int height   = bitmap.getHeight( );
-		int width    = bitmap.getWidth( );
-		int[] pixels = new int[( width * height )];
-		bitmap.getPixels( pixels, 0, width, 0, 0, width, height );
-
-		for( int YY = 0; YY < width; ++YY ){
-			for( int XX = 0; XX < height; ++XX ){
-				int bitmapColor = pixels[( YY + XX * width )];
-        		int rr = Color.red( bitmapColor );
-        		int gg = Color.green( bitmapColor );
-        		int bb = Color.blue( bitmapColor );
-
-        		int X, Y;
-        		Y = ( rr + gg + bb ) / 3;
-
-        		if( Y < 128 ){
-        			X = 0;
-        		} else {
-        			X = 255;
-        		}
-
-        		rr = X;
-        		gg = X;
-        		bb = X;
-
-        		pixels[( YY + XX * width )] = Color.rgb( rr, gg, bb );
-      		}
-    	}
-
-    	bitmap.setPixels( pixels, 0, width, 0, 0, width, height );
-    	return bitmap;
 	}
 	
 	public static Bitmap effectChangeContrast(Bitmap bitmap, double effectLevel) {
@@ -227,10 +265,6 @@ public class CaptureHelper {
 	
 	public static int getMainColor(Bitmap bitmap) {
 		int[] colorSum = getRGBSum(bitmap);
-		
-		for (int i = 0; i < colorSum.length; i++) {
-			Log.d("TAG", String.valueOf(i) + " " + String.valueOf(colorSum[i]));
-		}
 		
 		int tmpVal = 0;
 		int maxKey = 0;
@@ -535,7 +569,6 @@ public class CaptureHelper {
 			float similarity = 0;
 			if(maxImageId > 0) {
 				similarity = (float)maxVotes/trainDescs.get(maxImageId).rows()*100;
-				Log.d("TAG", "id:" + String.valueOf(maxImageId) + " sim:" + String.valueOf(similarity));
 //				if(similarity < 5) {
 //					maxImageId = -1;
 //				}
@@ -544,7 +577,6 @@ public class CaptureHelper {
 			detectedTileIds[i] = maxImageId;
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
 			similarities[i] = similarity;
-			Log.d("TAG", "id:" + String.valueOf(maxImageId) + " name:" + detectedTileNames[i] + " sim:" + String.valueOf(similarities[i]));
 		}
 	}
 	
@@ -565,19 +597,16 @@ public class CaptureHelper {
 				case Color.RED:
 					predetectionResult[i] = "Red";
 					matcher = rMatcher;
-					Log.d("TAG", "red");
 					break;
 					
 				case Color.GREEN:
 					predetectionResult[i] = "Green";
 					matcher = gMatcher;
-					Log.d("TAG", "green");
 					break;
 					
 				case Color.BLUE:
 					predetectionResult[i] = "Blue";
 					matcher = bMatcher;
-					Log.d("TAG", "blue");
 					break;
 	
 				default:
@@ -634,7 +663,6 @@ public class CaptureHelper {
 			float similarity = 0;
 			if(maxImageId > 0) {
 				similarity = (float)maxVotes/trainDescs.get(maxImageId).rows()*100;
-				Log.d("TAG", "id:" + String.valueOf(maxImageId) + " sim:" + String.valueOf(similarity));
 				if(similarity < 5) {
 					maxImageId = -1;
 				}
@@ -643,7 +671,6 @@ public class CaptureHelper {
 			detectedTileIds[i] = convertId(maxImageId, mainColor);
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
 			similarities[i] = similarity;
-			Log.d("TAG", "id:" + String.valueOf(maxImageId) + " name:" + detectedTileNames[i] + " sim:" + String.valueOf(similarities[i]));
 		}
 	}
 

@@ -203,7 +203,6 @@ public class MahjongTileRecognizerActivity extends Activity {
 			float[] similarities = helper.getSimilarities();
 			
 			Bitmap[] slicedImages = helper.getSlicedImages();
-			Log.d("TAG", "saving sliced images");
 			String[] predetectionResult = new String[CaptureHelper.TILE_NUM];
 			String[] colors = {"Red", "Green", "Blue"};
 			for (int i=0; i < slicedImages.length; i++) {
@@ -221,7 +220,9 @@ public class MahjongTileRecognizerActivity extends Activity {
 					default:
 						break;
 				}
-				slicedImages[i] = CaptureHelper.effectDrawBoundingRect(slicedImages[i]);
+//				slicedImages[i] = CaptureHelper.effectChopBoundingRect(slicedImages[i]);
+				slicedImages[i] = CaptureHelper.effectDrawEdges(slicedImages[i]);
+				Log.d("TAG", "saving sliced image");
 				saveImageToSDCard(slicedImages[i]);
 			}
 			mOverlayView.setResult(tiles, similarities, predetectionResult);
