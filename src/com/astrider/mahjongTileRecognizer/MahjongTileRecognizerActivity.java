@@ -182,11 +182,11 @@ public class MahjongTileRecognizerActivity extends Activity {
 	
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
-		mItemEuclidean = menu.add("ユークリッド距離");
-		mItemORB = menu.add("ORB検出器");
-		mItemORBAdvanced = menu.add("拡張ORB検出器");
-		mItemToggleFlash = menu.add("フラッシュ点灯");
-		mItemLoadGallery = menu.add("ギャラリーから検出");
+		mItemEuclidean = menu.add("Euclidean");
+		mItemORB = menu.add("ORB");
+		mItemORBAdvanced = menu.add("Adv.ORB");
+		mItemToggleFlash = menu.add("Toggle Flash");
+		mItemLoadGallery = menu.add("From Gallery");
 		return true;
 	}
 

@@ -1,6 +1,7 @@
 package com.astrider.mahjongTileRecognizer;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -428,7 +429,7 @@ public class CaptureHelper {
 		}
 	}
 	
-	private int AdvancedId2NormalId(int srcId, String mainColor) {
+	private int advancedId2NormalId(int srcId, String mainColor) {
 		if(srcId == -1) {
 			return srcId;
 		}
@@ -439,7 +440,7 @@ public class CaptureHelper {
 				id = srcId;
 			} else if(srcId < 11) {
 				id = srcId + 5;
-			} else if(srcId < 16){
+			} else if(srcId < 15){
 				id = srcId + 16;
 			} else {
 				id = srcId + 17;
@@ -447,16 +448,14 @@ public class CaptureHelper {
 		}
 		
 		if(mainColor == "GREEN") {
-			if(srcId < 9) {
-				id = srcId + 9;
-			} else {
-				id = srcId + 18;
-			}
+			id = srcId + 18;			
 		}
 		
 		if(mainColor == "BLUE") {
-			if(srcId < 7) {
-				id = srcId + 18;
+			if(srcId < 5) {
+				id = srcId + 9;
+			} else if (srcId < 7) {
+				id = srcId + 11;
 			} else {
 				id = srcId + 20;
 			}
@@ -549,65 +548,11 @@ public class CaptureHelper {
 			// load next sliced tile image
 			Bitmap target = slicedImages[i];
 			
-			Mat descriptors = new Mat();
-			MatOfKeyPoint keypoint = new MatOfKeyPoint();
+			HashMap<String, Number> result = matchImage(matcher, target);
 			
-			// convert bitmap to gray mat
-			Mat mat = new Mat();
-			Utils.bitmapToMat(target, mat);
-			Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
-			
-			// detect, extract target image
-			detector.detect(mat, keypoint);
-			extractor.compute(mat, keypoint, descriptors);
-			
-			// do matching
-			MatOfDMatch matches = new MatOfDMatch();
-			matcher.match(descriptors, matches);
-			
-			// initialize vote box
-			int[] votes = new int[TEMPLATE_NUM];
-			for (int j = 0; j < TEMPLATE_NUM; j++) {
-				votes[j] = 0;
-			}
-			
-			// do vote
-			List<DMatch> myList = matches.toList();
-			Iterator<DMatch> itr = myList.iterator(); 
-			while(itr.hasNext()) 
-			{
-			      DMatch element = itr.next();
-			      if(element.distance < THRESHOLD) {
-			    	  votes[element.imgIdx]++;
-			      }
-			}
-			
-			int maxImageId = -1;
-			int maxVotes = 0;
-			for (int j = 0; j < TEMPLATE_NUM; j++) {
-				if(votes[j] > maxVotes ) {
-					maxImageId = j;
-					maxVotes = votes[j];
-				}
-			}
-			
-			List<Mat> trainDescs = new ArrayList<Mat>(); 
-			trainDescs = matcher.getTrainDescriptors();
-			
-			
-			
-			// if similarity is under 5%, set as undetected
-			float similarity = 0;
-			if(maxImageId > 0) {
-				similarity = (float)maxVotes/trainDescs.get(maxImageId).rows()*100;
-//				if(similarity < 5) {
-//					maxImageId = -1;
-//				}
-			}
-			
-			detectedTileIds[i] = maxImageId;
+			detectedTileIds[i] = (Integer) result.get("id");
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
-			similarities[i] = similarity;
+			similarities[i] = (Float) result.get("similarity");
 		}
 	}
 	
@@ -623,8 +568,6 @@ public class CaptureHelper {
 			Bitmap target = slicedImages[i];
 			String mainColor = mainColors[i];
 			
-			Log.d("TAG", String.valueOf(mainColor));
-			
 			DescriptorMatcher matcher = null; 
 			if (mainColor == "RED") {
 				matcher = rMatcher;
@@ -636,66 +579,76 @@ public class CaptureHelper {
 				Log.d("TAG", "fail");
 			}
 			
-			Mat descriptors = new Mat();
-			MatOfKeyPoint keypoint = new MatOfKeyPoint();
+			HashMap<String, Number> result = matchImage(matcher, target);
 			
-			// convert bitmap to gray mat
-			Mat mat = new Mat();
-			Utils.bitmapToMat(target, mat);
-			Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
-			
-			// detect, extract target image
-			detector.detect(mat, keypoint);
-			extractor.compute(mat, keypoint, descriptors);
-			
-			// do matching
-			MatOfDMatch matches = new MatOfDMatch();
-			matcher.match(descriptors, matches);
-			
-			// initialize vote box
-			int[] votes = new int[TEMPLATE_NUM];
-			for (int j = 0; j < TEMPLATE_NUM; j++) {
-				votes[j] = 0;
-			}
-			
-			// do vote
-			List<DMatch> myList = matches.toList();
-			Iterator<DMatch> itr = myList.iterator(); 
-			while(itr.hasNext()) 
-			{
-			      DMatch element = itr.next();
-			      if(element.distance < THRESHOLD) {
-			    	  votes[element.imgIdx]++;
-			      }
-			}
-			
-			int maxImageId = -1;
-			int maxVotes = 0;
-			for (int j = 0; j < TEMPLATE_NUM; j++) {
-				if(votes[j] > maxVotes ) {
-					maxImageId = j;
-					maxVotes = votes[j];
-				}
-			}
-			
-			List<Mat> trainDescs = new ArrayList<Mat>(); 
-			trainDescs = matcher.getTrainDescriptors();
-			
-			// if similarity is under 5%, set as undetected
-			float similarity = 0;
-			if(maxImageId > 0) {
-				similarity = (float)maxVotes/trainDescs.get(maxImageId).rows()*100;
-				if(similarity < 5) {
-					maxImageId = -1;
-				}
-			}
-			
-			detectedTileIds[i] = AdvancedId2NormalId(maxImageId, mainColor);
+			similarities[i] = (Float) result.get("similarity");
+			detectedTileIds[i] = advancedId2NormalId((Integer) result.get("id"), mainColor);
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
-			similarities[i] = similarity;
 		}
 	}
 
+	private HashMap<String, Number> matchImage(DescriptorMatcher matcher, Bitmap target) {
+		Mat descriptors = new Mat();
+		MatOfKeyPoint keypoint = new MatOfKeyPoint();
+		
+		// convert bitmap to gray mat
+		Mat mat = new Mat();
+		Utils.bitmapToMat(target, mat);
+		Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY);
+		
+		// detect, extract target image
+		detector.detect(mat, keypoint);
+		extractor.compute(mat, keypoint, descriptors);
+		
+		// do matching
+		MatOfDMatch matches = new MatOfDMatch();
+		matcher.match(descriptors, matches);
+		
+		// initialize vote box
+		int[] votes = new int[TEMPLATE_NUM];
+		for (int j = 0; j < TEMPLATE_NUM; j++) {
+			votes[j] = 0;
+		}
+		
+		// do vote
+		List<DMatch> myList = matches.toList();
+		Iterator<DMatch> itr = myList.iterator(); 
+		while(itr.hasNext()) 
+		{
+		      DMatch element = itr.next();
+		      if(element.distance < THRESHOLD) {
+		    	  votes[element.imgIdx]++;
+		      }
+		}
+		
+		int maxImageId = -1;
+		int maxVotes = 0;
+		for (int j = 0; j < TEMPLATE_NUM; j++) {
+			if(votes[j] > maxVotes ) {
+				maxImageId = j;
+				maxVotes = votes[j];
+			}
+		}
+		
+		List<Mat> trainDescs = new ArrayList<Mat>(); 
+		trainDescs = matcher.getTrainDescriptors();
+		
+		// if similarity is under 5%, set as undetected
+		float similarity = 0;
+		if(maxImageId > 0) {
+			similarity = (float)maxVotes/trainDescs.get(maxImageId).rows()*100;
+			if(similarity < 5) {
+				maxImageId = -1;
+			}
+		}
+		
+		HashMap<String, Number> ret = new HashMap<String, Number>();
+		ret.put("id", maxImageId);
+		ret.put("similarity", similarity);
+		
+		return ret;
+	}
+	
 	// detect helpers
 	private double getEuclideanDistance(Bitmap src, Bitmap target) {
 		// check and convert resolution
@@ -765,7 +718,7 @@ public class CaptureHelper {
 	
 	// getters
 	public String getCurrentMethod() {
-		String[] methods = {"ユークリッド距離", "ORB検出器", "拡張ORB検出器"};
+		String[] methods = {"Euclidean Distance", "ORB Matcher", "Adv. ORB Matcher"};
 		return methods[methodType];
 	}
 	

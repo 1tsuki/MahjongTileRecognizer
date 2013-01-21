@@ -59,8 +59,8 @@ public class OverlayView extends View {
 		paint.setColor(Color.WHITE);
 		paint.setTextSize(30.0f);
 		paint.setTextAlign(Align.CENTER);
-		canvas.drawText("赤い枠線に牌が収まるように調整して下さい。", getWidth() / 2, getHeight() - 10, paint);
-		canvas.drawText("長押しでオートフォーカス、離して撮影", getWidth() / 2, getHeight() - 40, paint);
+		canvas.drawText("Align all tiles on the red grid line.", getWidth() / 2, getHeight() - 10, paint);
+		canvas.drawText("Press down to auto-focus, release to capture.", getWidth() / 2, getHeight() - 40, paint);
 		
 		if(currentMethod != null) {
 			paint.setTextAlign(Align.LEFT);
