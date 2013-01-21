@@ -116,7 +116,7 @@ public class MahjongTileRecognizerActivity extends Activity {
 			// decode picture and do things
 			Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
 			saveImageToSDCard(bitmap);
-			onComputePicture(bitmap);
+			analyzePicture(bitmap);
 		}
 	};
 	
@@ -135,6 +135,7 @@ public class MahjongTileRecognizerActivity extends Activity {
 	}
 		
     /** Called when the activity is first created. */
+	@SuppressWarnings("deprecation")
 	@Override
     public void onCreate(Bundle savedInstanceState) {
 		// initialize
@@ -245,11 +246,13 @@ public class MahjongTileRecognizerActivity extends Activity {
 //		t.start();
 	}
 	
-	private void onComputePicture(Bitmap bitmap) {
+	private void analyzePicture(Bitmap bitmap) {
+		Log.d("TAG", "analyzing picture...");
 		try {
 			helper.setSourceImage(bitmap);
 			String[] mainColors = helper.getMainColors();
-			String[] tiles = helper.identifyTiles();
+			long time = helper.identifyTiles();
+			String[] tiles = helper.getDetectedTileNames();
 			float[] similarities = helper.getSimilarities();
 			
 			Bitmap[] slicedImages = helper.getSlicedImages();
@@ -261,7 +264,7 @@ public class MahjongTileRecognizerActivity extends Activity {
 			}
 			helper.recycleSlicedImages();
 			
-			mOverlayView.setResult(tiles, similarities, mainColors);
+			mOverlayView.setResult(time, tiles, similarities, mainColors);
 		} catch (Exception e) {
 			Log.d("TAG", "caught exception");
 			e.printStackTrace();
@@ -288,9 +291,8 @@ public class MahjongTileRecognizerActivity extends Activity {
 			try {
 				InputStream in = getContentResolver().openInputStream(data.getData());
 				Bitmap bitmap = BitmapFactory.decodeStream(in);
-				Log.d("TAG", "decoded bitmap");
 				
-				onComputePicture(bitmap);
+				analyzePicture(bitmap);
 			} catch (Exception e) {
 				
 			}

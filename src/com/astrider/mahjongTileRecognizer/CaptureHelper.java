@@ -6,7 +6,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.opencv.android.Utils;
-import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfDMatch;
 import org.opencv.core.MatOfKeyPoint;
@@ -35,13 +34,13 @@ public class CaptureHelper {
 	public static final int ASPECT_RATIO = 4/3;
 	public static final int DEFAULT_WIDTH = 30;
 	public static final int DEFAULT_HEIGHT = DEFAULT_WIDTH * ASPECT_RATIO;
-	public static final int TILE_NUM = 14;
+	public static final int TILE_NUM = 5;
 	public static final int TEMPLATE_NUM = 33;
 	public static final int THRESHOLD = 45;
 	public static final int METHOD_EUCLIDEANDISTANCE = 0;
 	public static final int METHOD_ORB = 1;
 	public static final int METHOD_ORB_ADVANCED = 2;
-	public static final double CONTRAST_LEVEL = 3;
+	public static final int CONTRAST_LEVEL = 180;
 	
 	Resources res;
 	String packageName;
@@ -115,13 +114,14 @@ public class CaptureHelper {
 		
 		Mat src = new Mat();
 		Utils.bitmapToMat(bitmap, src);
-		int min_x_thresh = (int) (src.rows() * 0.01);
-		int max_x_thresh = (int) (src.rows() * 0.01);
-		int min_y_thresh = (int) (src.cols() * 0.01);
-		int max_y_thresh = (int) (src.cols() * 0.01);
+		int padding = (int) (src.width() * 0.1);
+		int min_x_thresh = padding;
+		int max_x_thresh = src.width() - padding;
+		int min_y_thresh = padding;
+		int max_y_thresh = src.height() - padding;
 		
-		Point pt1 = new Point(src.rows() / 2, src.cols() / 2);
-		Point pt2 = new Point(src.rows() / 2, src.cols() / 2);
+		Point pt1 = new Point(src.width() / 2, src.height() / 2);
+		Point pt2 = new Point(src.width() / 2, src.height() / 2);
 		double x, y, tmp[];
 		for (int i = 0; i < contours.size(); i++) {
 			Mat m = contours.get(i);
@@ -133,11 +133,11 @@ public class CaptureHelper {
 				if(min_x_thresh < x && x < pt1.x) {
 					pt1.x = x;
 				}
-				if(pt2.x < x && x < max_x_thresh ) {
-					pt2.x = x;
-				}
 				if(min_y_thresh < y && y < pt1.y) {
 					pt1.y = y;
+				}
+				if(pt2.x < x && x < max_x_thresh ) {
+					pt2.x = x;
 				}
 				if(pt2.y < y && y < max_y_thresh) {
 					pt2.y = y;
@@ -146,10 +146,11 @@ public class CaptureHelper {
 		}
 			
 		Mat sub = src.submat(new Rect(pt1, pt2));
-		if(sub.width() <= 0 || sub.height() <= 0) {
+		if(sub.width() == 0 || sub.height() == 0) {			
 			return bitmap;
 		}
 		
+		Log.d("TAG", "Contour x:" + String.valueOf(pt1.x) + " to " + String.valueOf(pt2.x) + " y:" + String.valueOf(pt1.y) + " to " + String.valueOf(pt2.y));
 		Bitmap chopped = Bitmap.createBitmap(sub.width(), sub.height(), Bitmap.Config.ARGB_8888);
 		Utils.matToBitmap(sub, chopped);
 		return chopped;
@@ -216,6 +217,36 @@ public class CaptureHelper {
 		return dst;
 	}
 	
+	public static Bitmap effectWhiten(Bitmap bitmap, int threshold) {
+		if( bitmap == null ){
+			return bitmap;
+		}
+		
+		Bitmap dst = bitmap.copy( Bitmap.Config.ARGB_8888, true );
+
+		int height   = dst.getHeight( );
+		int width    = dst.getWidth( );
+		int[] pixels = new int[( width * height )];
+		dst.getPixels( pixels, 0, width, 0, 0, width, height );
+
+		for( int YY = 0; YY < width; ++YY ){
+			for( int XX = 0; XX < height; ++XX ){
+				int bitmapColor = pixels[( YY + XX * width )];
+				int[] color = {Color.red(bitmapColor), Color.green(bitmapColor), Color.blue(bitmapColor)};
+				
+				if (color[0] > threshold && color[1] > threshold && color[3] > threshold) {
+					color[0] = 255;
+					color[1] = 255;
+					color[2] = 255;
+				}
+        		pixels[( YY + XX * width )] = Color.rgb( color[0], color[1], color[2] );
+      		}
+    	}
+		
+    	dst.setPixels( pixels, 0, width, 0, 0, width, height );
+    	return dst;
+	}
+	
 	public static Bitmap effectChangeContrast(Bitmap bitmap, double effectLevel) {
 		if( bitmap == null ){
 			return bitmap;
@@ -233,9 +264,14 @@ public class CaptureHelper {
 				int bitmapColor = pixels[( YY + XX * width )];
 				int[] color = {Color.red(bitmapColor), Color.green(bitmapColor), Color.blue(bitmapColor)};
 				
+				if (color[0] > 200 && color[1] > 200 && color[3] > 200) {
+					color[0] = 255;
+					color[1] = 255;
+					color[2] = 255;
+				}
+				
 				for (int i = 0; i < color.length; i++) {
 					int tmpColor = color[i];
-					
 					tmpColor = (int) ((tmpColor - 128) * effectLevel + 128);
 					if(tmpColor < 0) {
 						tmpColor = 0;
@@ -317,8 +353,7 @@ public class CaptureHelper {
 		float unitWidth = unitSize[0];
 		float unitHeight = unitSize[1];
 		
-//		float left = unitWidth;
-		float left = 0;
+		float left = unitWidth;
 		float bottom = height / 2;
 		
 		for (int i = 0; i < tiles.length; i++) {
@@ -333,7 +368,7 @@ public class CaptureHelper {
 	
 	public static float[] getUnitSize(float width, float height) {
 		float[] unitSize = new float[2];
-		float unitWidth = width / 14;
+		float unitWidth = width / (TILE_NUM + 2);
 		float unitHeight = unitWidth * 4/3;
 		
 		unitSize[0] = unitWidth;
@@ -343,30 +378,31 @@ public class CaptureHelper {
 	}
 
 	// public methods
-	public String[] identifyTiles() throws Exception {
+	public long identifyTiles() throws Exception {
 		if (!isSourceLoaded) {
 			throw new Exception("Source Image not loaded");
 		}
 		
+		long time;
 		switch (methodType) {
 			case METHOD_EUCLIDEANDISTANCE:
-				euclideanDistanceDetection();
+				time = euclideanDistanceDetection();
 				break;
 				
 			case METHOD_ORB:
-				orbDetection();
+				time = orbDetection();
 				break;
 				
 			case METHOD_ORB_ADVANCED:
-				orbAdvancedDetection();
+				time = orbAdvancedDetection();
 				break;
 	
 			default:
-				orbAdvancedDetection();
+				time = orbAdvancedDetection();
 				break;
 		}
 		
-		return detectedTileNames;
+		return time;
 	}
 	
 	public String[] getMainColors() {
@@ -424,7 +460,7 @@ public class CaptureHelper {
 			int height = (int) coords[i][3] - y;
 			
 			Bitmap slicedImage = Bitmap.createBitmap(sourceImage, x, y, width, height);
-			slicedImage = effectChangeContrast(slicedImage, CONTRAST_LEVEL);
+			slicedImage = effectWhiten(slicedImage, CONTRAST_LEVEL);
 			slicedImages[i] = slicedImage;
 		}
 	}
@@ -518,8 +554,10 @@ public class CaptureHelper {
 	}
 	
 	// detectors
-	private void euclideanDistanceDetection() {
+	private long euclideanDistanceDetection() {
 		Log.d("TAG", "Runninng euclidean Distance Detection");
+		long start = System.currentTimeMillis();
+		
 		// prepare variables
 		double tmpVal = 0;
 		double minDiff = 100;
@@ -540,10 +578,14 @@ public class CaptureHelper {
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
 			similarities[i] = (float) (100 - minDiff);
 		}
+		
+		long end = System.currentTimeMillis();
+		return end - start;
 	}
 	
-	private void orbDetection() {
+	private long orbDetection() {
 		Log.d("TAG", "Runninng orb Detection");
+		long start = System.currentTimeMillis();
 		for (int i=0; i<slicedImages.length; i++) {
 			// load next sliced tile image
 			Bitmap target = slicedImages[i];
@@ -554,11 +596,15 @@ public class CaptureHelper {
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
 			similarities[i] = (Float) result.get("similarity");
 		}
+		
+		long end = System.currentTimeMillis();
+		return end - start;
 	}
 	
-	private void orbAdvancedDetection() {
+	private long orbAdvancedDetection() {
 		Log.d("TAG", "Runninng orb Advanced Detection");
 		
+		long start = System.currentTimeMillis();
 		if(mainColors == null) {
 			getMainColors();
 		}
@@ -585,6 +631,9 @@ public class CaptureHelper {
 			detectedTileIds[i] = advancedId2NormalId((Integer) result.get("id"), mainColor);
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
 		}
+		
+		long end = System.currentTimeMillis();
+		return end - start;
 	}
 
 	private HashMap<String, Number> matchImage(DescriptorMatcher matcher, Bitmap target) {

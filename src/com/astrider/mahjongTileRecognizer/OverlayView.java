@@ -3,7 +3,6 @@ package com.astrider.mahjongTileRecognizer;
 import java.math.BigDecimal;
 
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -12,6 +11,7 @@ import android.view.View;
 
 public class OverlayView extends View {
 	Paint paint = new Paint();
+	long time;
 	String[] tiles;
 	String[] predetetionResult;
 	String currentMethod;
@@ -29,7 +29,7 @@ public class OverlayView extends View {
 		drawBackground(canvas);
 		drawLines(canvas);
 		
-		if(tiles != null && similarities != null) {
+		if(time != 0 && tiles != null && similarities != null) {
 			drawResult(canvas);
 		}
 	}
@@ -39,13 +39,15 @@ public class OverlayView extends View {
 		invalidate();
 	}
 	
-	public void setResult(String[] tiles, float[] similarities) {
+	public void setResult(long time, String[] tiles, float[] similarities) {
+		this.time = time;
 		this.tiles = tiles;
 		this.similarities = similarities;
 		invalidate();
 	}
 	
-	public void setResult(String[] tiles, float[] similarities, String[] predetectionResult) {
+	public void setResult(long time, String[] tiles, float[] similarities, String[] predetectionResult) {
+		this.time = time;
 		this.tiles = tiles;
 		this.similarities = similarities;
 		this.predetetionResult = predetectionResult;
@@ -82,6 +84,7 @@ public class OverlayView extends View {
 		}
 	}
 
+	@SuppressWarnings("unused")
 	private void drawCrosshair(Canvas canvas) {
 		paint.setColor(Color.RED);
 		for (int i = 0; i < coords.length; i++) {
@@ -115,6 +118,10 @@ public class OverlayView extends View {
 				canvas.drawText(predetetionResult[i], x, y + 40, paint);
 			}
 		}
+		
+		paint.setTextAlign(Align.RIGHT);
+		canvas.drawText(String.valueOf(time) + "ms", width, height, paint);
+		
 		invalidate();
 	}
 }
