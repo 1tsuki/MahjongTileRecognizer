@@ -64,6 +64,7 @@ public class OverlayView extends View {
 		
 		if(currentMethod != null) {
 			paint.setTextAlign(Align.LEFT);
+			paint.setColor(Color.RED);
 			canvas.drawText(currentMethod, 0, getHeight() - 10, paint);
 		}
 	}
@@ -82,12 +83,7 @@ public class OverlayView extends View {
 	}
 
 	private void drawCrosshair(Canvas canvas) {
-		// set crosshair color to red
 		paint.setColor(Color.RED);
-		
-		drawBackground(canvas);
-		
-		// draw crosshair
 		for (int i = 0; i < coords.length; i++) {
 			canvas.drawLine(coords[i][0], coords[i][1], coords[i][0], coords[i][3], paint);
 			canvas.drawLine(coords[i][0], coords[i][1], coords[i][2], coords[i][1], paint);

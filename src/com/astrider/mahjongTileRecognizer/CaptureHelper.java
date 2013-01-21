@@ -57,6 +57,7 @@ public class CaptureHelper {
 	DescriptorExtractor extractor = DescriptorExtractor.create(DescriptorExtractor.ORB);
 	
 	Bitmap[] slicedImages = null;
+	String[] mainColors = null;
 	int[] detectedTileIds = new int[TILE_NUM];
 	String[] detectedTileNames = new String[TILE_NUM];
 	String[] predetectionResult = new String[TILE_NUM];
@@ -64,7 +65,6 @@ public class CaptureHelper {
 		
 	// constructors
 	public CaptureHelper(Resources res, String packageName, int methodType) {
-		this.isSourceLoaded = false;
 		this.res = res;
 		this.packageName = packageName;
 		this.methodType = methodType;
@@ -72,12 +72,13 @@ public class CaptureHelper {
 	}
 	
 	public CaptureHelper(Bitmap sourceImage, Resources res, String packageName, int methodType) {
-		this.isSourceLoaded = false;
 		this.res = res;
 		this.packageName = packageName;
 		this.methodType = methodType;
 		sliceImage(sourceImage);
 		loadTemplates();
+		
+		this.isSourceLoaded = true;
 	}
 	
 	// static methods (tools)
@@ -106,7 +107,7 @@ public class CaptureHelper {
 		return dst;
 	}
 	
-	public static Bitmap effectChopEdges(Bitmap bitmap, List<MatOfPoint> contours) {
+	public static Bitmap chopWithContours(Bitmap bitmap, List<MatOfPoint> contours) {
 		if(contours.size() < 1) {
 			return bitmap;
 		}
@@ -153,7 +154,7 @@ public class CaptureHelper {
 		return chopped;
 	}
 	
-	public static Bitmap effectChopBoundingRect(Bitmap bitmap) {
+	public static Bitmap chopWithBoundingRect(Bitmap bitmap) {
 		Mat src = new Mat();
 		MatOfKeyPoint keyPoints = new MatOfKeyPoint();
 		
@@ -196,12 +197,10 @@ public class CaptureHelper {
 		return bitmap;
 	}
 	
-	public static Bitmap effectConvertResolution(Bitmap src) {
+	public static Bitmap effectChangeResolution(Bitmap src, int dstWidth, int dstHeight) {
 		// check current resolution
 		int srcWidth = src.getWidth();
 		int srcHeight = src.getHeight();
-		float dstWidth = DEFAULT_WIDTH;
-		float dstHeight = DEFAULT_HEIGHT;
 		
 		// return if convert is not needed
 		if(srcWidth == dstWidth && srcHeight == dstHeight) {
@@ -273,7 +272,7 @@ public class CaptureHelper {
 		return sum;
 	}
 	
-	public static int getMainColor(Bitmap bitmap) {
+	public static String getMainColor(Bitmap bitmap) {
 		int[] colorSum = getRGBSum(bitmap);
 		
 		int tmpVal = 0;
@@ -285,7 +284,7 @@ public class CaptureHelper {
 			}
 		}
 		
-		int[] colorArray = {Color.RED, Color.GREEN, Color.BLUE};
+		String[] colorArray = {"RED", "GREEN", "BLUE"};
 		return colorArray[maxKey];
 	}
 	
@@ -369,6 +368,27 @@ public class CaptureHelper {
 		return detectedTileNames;
 	}
 	
+	public String[] getMainColors() {
+		mainColors = new String[TILE_NUM];
+		for (int i = 0; i < slicedImages.length; i++) {
+			mainColors[i] = getMainColor(slicedImages[i]);
+		}
+		
+		return mainColors;
+	}
+	
+	public void recycleSlicedImages() {
+		Log.d("TAG", "Recycled sliced images");
+		if(slicedImages != null) {
+			for (int i = 0; i < slicedImages.length; i++) {
+				if(slicedImages[i] != null) {
+					slicedImages[i].recycle();
+					slicedImages[i] = null;
+				}
+			}
+		}
+	}
+	
 	// private methods
 	private void loadTemplates() {
 		switch (methodType) {
@@ -391,6 +411,7 @@ public class CaptureHelper {
 	}
 	
 	private void sliceImage(Bitmap sourceImage) {
+		Log.d("TAG", "Slice Image");
 		slicedImages = new Bitmap[TILE_NUM];
 		
 		float[][] coords = getTileCoords(sourceImage.getWidth(), sourceImage.getHeight());
@@ -407,13 +428,13 @@ public class CaptureHelper {
 		}
 	}
 	
-	private int convertId(int srcId, int mainColor) {
+	private int AdvancedId2NormalId(int srcId, String mainColor) {
 		if(srcId == -1) {
 			return srcId;
 		}
 		
 		int id = -1;
-		if(mainColor == Color.RED) {
+		if(mainColor == "RED") {
 			if(srcId < 9) {
 				id = srcId;
 			} else if(srcId < 11) {
@@ -425,7 +446,7 @@ public class CaptureHelper {
 			}
 		}
 		
-		if(mainColor == Color.GREEN) {
+		if(mainColor == "GREEN") {
 			if(srcId < 9) {
 				id = srcId + 9;
 			} else {
@@ -433,7 +454,7 @@ public class CaptureHelper {
 			}
 		}
 		
-		if(mainColor == Color.BLUE) {
+		if(mainColor == "BLUE") {
 			if(srcId < 7) {
 				id = srcId + 18;
 			} else {
@@ -455,7 +476,7 @@ public class CaptureHelper {
 		
 		for (int i = 0; i<ids.length; i++) {
 			Bitmap src = BitmapFactory.decodeResource(res, ids[i]);
-			Bitmap converted = effectConvertResolution(src);
+			Bitmap converted = effectChangeResolution(src, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 			templateImages[i] = converted;
 		}
 	}
@@ -593,35 +614,26 @@ public class CaptureHelper {
 	private void orbAdvancedDetection() {
 		Log.d("TAG", "Runninng orb Advanced Detection");
 		
+		if(mainColors == null) {
+			getMainColors();
+		}
+		
 		for (int i=0; i<slicedImages.length; i++) {
 			// load next sliced tile image
 			Bitmap target = slicedImages[i];
-//			int[] averageColor = getRGBAverage();
-//			int mainColor = getMainColor(target, averageColor);
-			int mainColor = getMainColor(target);
+			String mainColor = mainColors[i];
 			
 			Log.d("TAG", String.valueOf(mainColor));
 			
 			DescriptorMatcher matcher = null; 
-			switch (mainColor) {
-				case Color.RED:
-					predetectionResult[i] = "Red";
-					matcher = rMatcher;
-					break;
-					
-				case Color.GREEN:
-					predetectionResult[i] = "Green";
-					matcher = gMatcher;
-					break;
-					
-				case Color.BLUE:
-					predetectionResult[i] = "Blue";
-					matcher = bMatcher;
-					break;
-	
-				default:
-					Log.d("TAG", "fail");
-					break;
+			if (mainColor == "RED") {
+				matcher = rMatcher;
+			} else if (mainColor == "GREEN") {
+				matcher = gMatcher;
+			} else if (mainColor == "BLUE") {
+				matcher = bMatcher;
+			} else {
+				Log.d("TAG", "fail");
 			}
 			
 			Mat descriptors = new Mat();
@@ -678,7 +690,7 @@ public class CaptureHelper {
 				}
 			}
 			
-			detectedTileIds[i] = convertId(maxImageId, mainColor);
+			detectedTileIds[i] = AdvancedId2NormalId(maxImageId, mainColor);
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
 			similarities[i] = similarity;
 		}
@@ -687,8 +699,8 @@ public class CaptureHelper {
 	// detect helpers
 	private double getEuclideanDistance(Bitmap src, Bitmap target) {
 		// check and convert resolution
-		src = effectConvertResolution(src);
-		target = effectConvertResolution(target);
+		src = effectChangeResolution(src, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+		target = effectChangeResolution(target, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 		
 		// get pixels
 		int[] srcPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
@@ -780,13 +792,7 @@ public class CaptureHelper {
 	// setters
 	public void setSourceImage(Bitmap sourceImage) {
 		// clear current resources
-		if (slicedImages != null) {
-			for (Bitmap slicedImage : slicedImages) {
-				slicedImage.recycle();
-				slicedImage = null;
-			}
-		}
-		
+		recycleSlicedImages();
 		for (int i = 0; i < detectedTileIds.length; i++) {
 			detectedTileIds[i] = -1;
 		}

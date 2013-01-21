@@ -18,7 +18,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
 import android.hardware.Camera;
@@ -51,9 +50,11 @@ public class MahjongTileRecognizerActivity extends Activity {
 	private MenuItem mItemEuclidean;
 	private MenuItem mItemORB;
 	private MenuItem mItemORBAdvanced;
+	private MenuItem mItemToggleFlash;
 	private MenuItem mItemLoadGallery;
 	
 	boolean isCameraPaused = false;
+	boolean isFlashOn = false;
 	
 	private CaptureHelper helper;
 	
@@ -115,7 +116,7 @@ public class MahjongTileRecognizerActivity extends Activity {
 			// decode picture and do things
 			Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
 			saveImageToSDCard(bitmap);
-			onComputePicture(bitmap);		
+			onComputePicture(bitmap);
 		}
 	};
 	
@@ -184,6 +185,7 @@ public class MahjongTileRecognizerActivity extends Activity {
 		mItemEuclidean = menu.add("ユークリッド距離");
 		mItemORB = menu.add("ORB検出器");
 		mItemORBAdvanced = menu.add("拡張ORB検出器");
+		mItemToggleFlash = menu.add("フラッシュ点灯");
 		mItemLoadGallery = menu.add("ギャラリーから検出");
 		return true;
 	}
@@ -196,7 +198,9 @@ public class MahjongTileRecognizerActivity extends Activity {
             helper.setMethod(CaptureHelper.METHOD_ORB);
         } else if (item == mItemORBAdvanced) {
             helper.setMethod(CaptureHelper.METHOD_ORB_ADVANCED);
-        } else if (item == mItemLoadGallery) {
+        } else if (item == mItemToggleFlash) {
+        	toggleFlash();
+    	} else if (item == mItemLoadGallery) {
         	loadFromGallery();
         }
         
@@ -243,37 +247,21 @@ public class MahjongTileRecognizerActivity extends Activity {
 	
 	private void onComputePicture(Bitmap bitmap) {
 		try {
-			Log.d("TAG", "set source image");
 			helper.setSourceImage(bitmap);
+			String[] mainColors = helper.getMainColors();
 			String[] tiles = helper.identifyTiles();
 			float[] similarities = helper.getSimilarities();
 			
 			Bitmap[] slicedImages = helper.getSlicedImages();
-			String[] predetectionResult = new String[CaptureHelper.TILE_NUM];
 			for (int i=0; i < slicedImages.length; i++) {
-				switch (CaptureHelper.getMainColor(slicedImages[i])) {
-					case Color.RED:
-						predetectionResult[i] = "Red";
-						break;
-						
-					case Color.GREEN:
-						predetectionResult[i] = "Green";
-						
-					case Color.BLUE:
-						predetectionResult[i] = "Blue";
-	
-					default:
-						break;
-				}
 				saveImageToSDCard(slicedImages[i]);
-				
 				List<MatOfPoint> contours = CaptureHelper.getContours(slicedImages[i]);
-				slicedImages[i] = CaptureHelper.effectChopEdges(slicedImages[i], contours);
+				slicedImages[i] = CaptureHelper.chopWithContours(slicedImages[i], contours);
 				saveImageToSDCard(slicedImages[i]);
 			}
+			helper.recycleSlicedImages();
 			
-			mOverlayView.setResult(tiles, similarities, predetectionResult);
-//			mOverlayView.setResult(tiles, similarities);
+			mOverlayView.setResult(tiles, similarities, mainColors);
 		} catch (Exception e) {
 			Log.d("TAG", "caught exception");
 			e.printStackTrace();
@@ -361,6 +349,19 @@ public class MahjongTileRecognizerActivity extends Activity {
 			mCamera.release();
 			Log.d("TAG", "Failed to save image to SDCard");
 		}
+	}
+	
+	private void toggleFlash() {
+		Camera.Parameters cp = mCamera.getParameters();
+		if(isFlashOn) {
+			isFlashOn = false;
+			cp.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+		} else {
+			isFlashOn = true;
+			cp.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+		}
+		
+		mCamera.setParameters(cp);
 	}
 	
 	private boolean isCameraAvailable() {
