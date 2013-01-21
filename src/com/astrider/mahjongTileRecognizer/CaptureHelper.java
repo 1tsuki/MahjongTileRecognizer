@@ -234,7 +234,7 @@ public class CaptureHelper {
 				int bitmapColor = pixels[( YY + XX * width )];
 				int[] color = {Color.red(bitmapColor), Color.green(bitmapColor), Color.blue(bitmapColor)};
 				
-				if (color[0] > threshold && color[1] > threshold && color[3] > threshold) {
+				if (color[0] > threshold && color[1] > threshold && color[2] > threshold) {
 					color[0] = 255;
 					color[1] = 255;
 					color[2] = 255;
