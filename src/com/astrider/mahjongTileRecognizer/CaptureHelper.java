@@ -31,16 +31,15 @@ import android.graphics.Matrix;
 import android.util.Log;
 
 public class CaptureHelper {
-	public static final int ASPECT_RATIO = 4/3;
-	public static final int DEFAULT_WIDTH = 30;
-	public static final int DEFAULT_HEIGHT = DEFAULT_WIDTH * ASPECT_RATIO;
+	public static final int DEFAULT_WIDTH = 63;
+	public static final int DEFAULT_HEIGHT = 84;
 	public static final int TILE_NUM = 5;
 	public static final int TEMPLATE_NUM = 33;
 	public static final int THRESHOLD = 45;
 	public static final int METHOD_EUCLIDEANDISTANCE = 0;
 	public static final int METHOD_ORB = 1;
 	public static final int METHOD_ORB_ADVANCED = 2;
-	public static final int CONTRAST_LEVEL = 180;
+	public static final int CONTRAST_LEVEL = 96;
 	
 	Resources res;
 	String packageName;
@@ -200,21 +199,25 @@ public class CaptureHelper {
 	}
 	
 	public static Bitmap effectChangeResolution(Bitmap src, int dstWidth, int dstHeight) {
+		return Bitmap.createScaledBitmap(src, dstWidth, dstHeight, false);
 		// check current resolution
-		int srcWidth = src.getWidth();
-		int srcHeight = src.getHeight();
-		
-		// return if convert is not needed
-		if(srcWidth == dstWidth && srcHeight == dstHeight) {
-			return src;
-		}
-		
-		// convert resolution
-		Matrix matrix = new Matrix();
-		matrix.postScale(dstWidth / srcWidth, dstHeight / srcHeight);
-		Bitmap dst = Bitmap.createBitmap(src, 0, 0, srcWidth, srcHeight, matrix, true);
-		
-		return dst;
+//		int srcWidth = src.getWidth();
+//		int srcHeight = src.getHeight();
+//		
+//		// return if convert is not needed
+//		if(srcWidth == dstWidth && srcHeight == dstHeight) {
+//			return src;
+//		}
+//		
+//		
+//		
+//		// convert resolution
+//		Matrix matrix = new Matrix();
+//		matrix.postScale(dstWidth / srcWidth, dstHeight / srcHeight);
+//		Log.d("TAG", String.valueOf(dstWidth) + " " + String.valueOf(dstHeight) + " " + String.valueOf(srcWidth) + " " + String.valueOf(srcHeight));
+//		Bitmap dst = Bitmap.createBitmap(src, 0, 0, srcWidth, srcHeight, matrix, true);
+//		
+//		return dst;
 	}
 	
 	public static Bitmap effectWhiten(Bitmap bitmap, int threshold) {
@@ -503,6 +506,10 @@ public class CaptureHelper {
 	// helper methods for loading resource
 	private void setupEuclidianDistanceTemplates() {
 		Log.d("TAG", "setupEuclidianDistanceTemplates");
+//		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9,
+//				R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,
+//				R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
+//				R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
 		int[] ids = {R.drawable.euc_w1, R.drawable.euc_w2, R.drawable.euc_w3, R.drawable.euc_w4, R.drawable.euc_w5, R.drawable.euc_w6, R.drawable.euc_w7, R.drawable.euc_w8, R.drawable.euc_w9,
 					R.drawable.euc_p1, R.drawable.euc_p2, R.drawable.euc_p3, R.drawable.euc_p4, R.drawable.euc_p5, R.drawable.euc_p6, R.drawable.euc_p7, R.drawable.euc_p8, R.drawable.euc_p9,
 					R.drawable.euc_s1, R.drawable.euc_s2, R.drawable.euc_s3, R.drawable.euc_s4, R.drawable.euc_s5, R.drawable.euc_s6, R.drawable.euc_s7, R.drawable.euc_s8, R.drawable.euc_s9,
@@ -519,6 +526,10 @@ public class CaptureHelper {
 	private void setupORBMatcher() {
 		Log.d("TAG", "setupORBMatcher");
 		matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+//		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
+//				R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,  
+//				R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
+//				R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
 		int[] ids = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
 					R.drawable.orb_p1, R.drawable.orb_p2, R.drawable.orb_p3, R.drawable.orb_p4, R.drawable.orb_p5, R.drawable.orb_p6, R.drawable.orb_p7, R.drawable.orb_p8, R.drawable.orb_p9,  
 					R.drawable.orb_s1, R.drawable.orb_s2, R.drawable.orb_s3, R.drawable.orb_s4, R.drawable.orb_s5, R.drawable.orb_s6, R.drawable.orb_s7, R.drawable.orb_s8, R.drawable.orb_s9,
@@ -532,6 +543,16 @@ public class CaptureHelper {
 		rMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
 		gMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
 		bMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+//		int[] rIds = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
+//					R.drawable.p6, R.drawable.p7, 
+//					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j6};
+//		
+//		int[] gIds = {R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
+//					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, };
+//		
+//		int[] bIds = {R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p8, R.drawable.p9,
+//					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, };
+		
 		int[] rIds = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
 					R.drawable.orb_p6, R.drawable.orb_p7, 
 					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j6};
@@ -566,8 +587,10 @@ public class CaptureHelper {
 		// compare target with each templates
 		for (int i = 0; i < slicedImages.length; i++) {
 			Bitmap target = slicedImages[i];
+			List<MatOfPoint> contours = getContours(target);
+			Bitmap dst = chopWithContours(target, contours);
 			for (int j = 0; j < templateImages.length; j++) {
-				tmpVal = getEuclideanDistance(templateImages[j], target);
+				tmpVal = getEuclideanDistance(templateImages[j], dst);
 				if(tmpVal < minDiff) {
 					minDiff = tmpVal;
 					id = j;

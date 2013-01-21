@@ -4,12 +4,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.core.MatOfPoint;
 
 import android.app.Activity;
 import android.content.ContentResolver;
@@ -248,20 +246,14 @@ public class MahjongTileRecognizerActivity extends Activity {
 	
 	private void analyzePicture(Bitmap bitmap) {
 		Log.d("TAG", "analyzing picture...");
+		
 		try {
 			helper.setSourceImage(bitmap);
-			String[] mainColors = helper.getMainColors();
 			long time = helper.identifyTiles();
 			String[] tiles = helper.getDetectedTileNames();
 			float[] similarities = helper.getSimilarities();
+			String[] mainColors = helper.getMainColors();
 			
-			Bitmap[] slicedImages = helper.getSlicedImages();
-			for (int i=0; i < slicedImages.length; i++) {
-				saveImageToSDCard(slicedImages[i]);
-				List<MatOfPoint> contours = CaptureHelper.getContours(slicedImages[i]);
-				slicedImages[i] = CaptureHelper.chopWithContours(slicedImages[i], contours);
-				saveImageToSDCard(slicedImages[i]);
-			}
 			helper.recycleSlicedImages();
 			
 			mOverlayView.setResult(time, tiles, similarities, mainColors);
