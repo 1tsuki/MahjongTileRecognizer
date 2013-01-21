@@ -4,10 +4,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.MatOfPoint;
 
 import android.app.Activity;
 import android.content.ContentResolver;
@@ -51,10 +53,11 @@ public class MahjongTileRecognizerActivity extends Activity {
 	private MenuItem mItemORBAdvanced;
 	private MenuItem mItemLoadGallery;
 	
-	private CaptureHelper helper;
-	
 	boolean isCameraPaused = false;
 	
+	private CaptureHelper helper;
+	
+	// callbacks
 	private BaseLoaderCallback mOpenCVCallBack = new BaseLoaderCallback(this) {
 	   @Override
 	   public void onManagerConnected(int status) {
@@ -72,7 +75,50 @@ public class MahjongTileRecognizerActivity extends Activity {
 	     }
 	   }
 	};
+	private SurfaceHolder.Callback mSurfaceHolderCallback = new SurfaceHolder.Callback() {
+		public void surfaceCreated(SurfaceHolder holder) {
+			isCameraPaused = false;
+			mCamera = Camera.open();
+			try {
+				mCamera.setPreviewDisplay(holder);
+			} catch(IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		public void surfaceChanged(SurfaceHolder holder,
+				int format, int width, int height) {
+			isCameraPaused = false;
+			mCamera.startPreview();
+		}
+		
+		public void surfaceDestroyed(SurfaceHolder holder) {
+			isCameraPaused = true;
+			mCamera.stopPreview();
+			mCamera.release();
+			mCamera = null;
+		}
+	};
+	private Camera.PictureCallback mPictureCallback = new Camera.PictureCallback () {
+		public void onPictureTaken(byte[] data, Camera camera) {
+			mCamera.stopPreview();
+			isCameraPaused = true;
+			
+			// restart if capture failed
+			if(data == null) {
+				Log.d("TAG", "failed to get data");
+				isCameraPaused = false;
+				mCamera.startPreview();
+				return;
+			}
 
+			// decode picture and do things
+			Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+			saveImageToSDCard(bitmap);
+			onComputePicture(bitmap);		
+		}
+	};
+	
 	/** Call on every application resume **/
 	@Override
 	protected void onResume()
@@ -90,57 +136,16 @@ public class MahjongTileRecognizerActivity extends Activity {
     /** Called when the activity is first created. */
 	@Override
     public void onCreate(Bundle savedInstanceState) {
-    	// initialize
-        super.onCreate(savedInstanceState);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
-        // initialize views
-        mFrameLayout = new FrameLayout(this);
-        mCameraView = new SurfaceView(this);
-        mOverlayView = new OverlayView(this);
-    }
-	
-	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-		mItemEuclidean = menu.add("ユークリッド距離");
-		mItemORB = menu.add("ORB検出器");
-		mItemORBAdvanced = menu.add("拡張ORB検出器");
-		mItemLoadGallery = menu.add("ギャラリーから検出");
-		return true;
-	}
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item == mItemEuclidean) {
-            helper.setMethod(CaptureHelper.METHOD_EUCLIDEANDISTANCE);
-        } else if (item == mItemORB) {
-            helper.setMethod(CaptureHelper.METHOD_ORB);
-        } else if (item == mItemORBAdvanced) {
-            helper.setMethod(CaptureHelper.METHOD_ORB_ADVANCED);
-        } else if (item == mItemLoadGallery) {
-        	loadFromGallery();
-        }
+		// initialize
+		super.onCreate(savedInstanceState);
+		getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+		
+		// initialize views
+		mFrameLayout = new FrameLayout(this);
+		mCameraView = new SurfaceView(this);
+		mOverlayView = new OverlayView(this);
         
-        mOverlayView.setCurrentMethod(helper.getCurrentMethod());
-        return true;
-    }
-	
-	private void onOpenCVLoad() {
-        // abort if camera not detected
-    	if(!isCameraAvailable()) {
-    		int duration = Toast.LENGTH_LONG;
-    		CharSequence text = "This app requires Camera";
-    		Toast toast = Toast.makeText(this, text, duration);
-    		toast.show();
-    		
-    		finish();
-    	}
-    	
-    	// initialize helper
-    	helper = new CaptureHelper(getResources(), getPackageName(), CaptureHelper.METHOD_ORB);
-    	mOverlayView.setCurrentMethod(helper.getCurrentMethod());
-    	
 		// setup cameraView
         SurfaceHolder holder = mCameraView.getHolder();
         holder.addCallback(mSurfaceHolderCallback);
@@ -172,29 +177,70 @@ public class MahjongTileRecognizerActivity extends Activity {
         mFrameLayout.addView(mCameraView);
         mFrameLayout.addView(mOverlayView);
         setContentView(mFrameLayout);
+    }
+	
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		mItemEuclidean = menu.add("ユークリッド距離");
+		mItemORB = menu.add("ORB検出器");
+		mItemORBAdvanced = menu.add("拡張ORB検出器");
+		mItemLoadGallery = menu.add("ギャラリーから検出");
+		return true;
 	}
 
-	private Camera.PictureCallback mPictureCallback = new Camera.PictureCallback () {
-		public void onPictureTaken(byte[] data, Camera camera) {
-			mCamera.stopPreview();
-			isCameraPaused = true;
-			
-			// restart if capture failed
-			if(data == null) {
-				Log.d("TAG", "failed to get data");
-				isCameraPaused = false;
-				mCamera.startPreview();
-				return;
-			}
-
-			// decode picture and do things
-			Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-			saveImageToSDCard(bitmap);
-			onComputePicture(bitmap);		
-		}
-	};
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item == mItemEuclidean) {
+            helper.setMethod(CaptureHelper.METHOD_EUCLIDEANDISTANCE);
+        } else if (item == mItemORB) {
+            helper.setMethod(CaptureHelper.METHOD_ORB);
+        } else if (item == mItemORBAdvanced) {
+            helper.setMethod(CaptureHelper.METHOD_ORB_ADVANCED);
+        } else if (item == mItemLoadGallery) {
+        	loadFromGallery();
+        }
+        
+        mOverlayView.setCurrentMethod(helper.getCurrentMethod());
+        return true;
+    }
 	
+    // this method will be loaded after opencv is loaded.
+	private void onOpenCVLoad() {
+        // abort if camera not detected
+    	if(!isCameraAvailable()) {
+    		int duration = Toast.LENGTH_LONG;
+    		CharSequence text = "This app requires Camera";
+    		Toast toast = Toast.makeText(this, text, duration);
+    		toast.show();
+    		
+    		finish();
+    	}
+    	
+    	// initialize helper
+    	helper = new CaptureHelper(getResources(), getPackageName(), CaptureHelper.METHOD_ORB);
+    	mOverlayView.setCurrentMethod(helper.getCurrentMethod());
+	}
 
+	private void autoFocus() {
+		mCamera.autoFocus(null);
+	}
+	
+	private void takePicture() {
+		mCamera.stopPreview();
+		mCamera.takePicture(null, null, mPictureCallback);
+//		Thread t = new Thread(new Runnable() {
+//			public void run() {
+//				try {
+//					Thread.sleep(1000);
+//				} catch (Exception e) {
+//				}
+//				
+//				mCamera.takePicture(null, null, mPictureCallback);
+//			}
+//		});
+//		t.start();
+	}
+	
 	private void onComputePicture(Bitmap bitmap) {
 		try {
 			Log.d("TAG", "set source image");
@@ -204,7 +250,6 @@ public class MahjongTileRecognizerActivity extends Activity {
 			
 			Bitmap[] slicedImages = helper.getSlicedImages();
 			String[] predetectionResult = new String[CaptureHelper.TILE_NUM];
-			String[] colors = {"Red", "Green", "Blue"};
 			for (int i=0; i < slicedImages.length; i++) {
 				switch (CaptureHelper.getMainColor(slicedImages[i])) {
 					case Color.RED:
@@ -220,13 +265,14 @@ public class MahjongTileRecognizerActivity extends Activity {
 					default:
 						break;
 				}
-//				slicedImages[i] = CaptureHelper.effectChopBoundingRect(slicedImages[i]);
-				slicedImages[i] = CaptureHelper.effectDrawEdges(slicedImages[i]);
-				Log.d("TAG", "saving sliced image");
+				saveImageToSDCard(slicedImages[i]);
+				
+				List<MatOfPoint> contours = CaptureHelper.getContours(slicedImages[i]);
+				slicedImages[i] = CaptureHelper.effectChopEdges(slicedImages[i], contours);
 				saveImageToSDCard(slicedImages[i]);
 			}
-			mOverlayView.setResult(tiles, similarities, predetectionResult);
 			
+			mOverlayView.setResult(tiles, similarities, predetectionResult);
 //			mOverlayView.setResult(tiles, similarities);
 		} catch (Exception e) {
 			Log.d("TAG", "caught exception");
@@ -236,54 +282,9 @@ public class MahjongTileRecognizerActivity extends Activity {
 		bitmap.recycle();
 		bitmap = null;
 	}
-
-	private SurfaceHolder.Callback mSurfaceHolderCallback = new SurfaceHolder.Callback() {
-		public void surfaceCreated(SurfaceHolder holder) {
-			mCamera = Camera.open();
-			try {
-				mCamera.setPreviewDisplay(holder);
-			} catch(IOException e) {
-				e.printStackTrace();
-			}
-		}
-		
-		public void surfaceChanged(SurfaceHolder holder,
-				int format, int width, int height) {
-			isCameraPaused = false;
-			mCamera.startPreview();
-		}
-		
-		public void surfaceDestroyed(SurfaceHolder holder) {
-			isCameraPaused = true;
-			mCamera.stopPreview();
-			mCamera.release();
-			mCamera = null;
-		}
-	};
-
-	private void autoFocus() {
-		mCamera.autoFocus(null);
-	}
-	
-	private void takePicture() {
-		mCamera.stopPreview();
-//			mCamera.setDisplayOrientation(90);
-		
-		// sleep and take picture
-		Thread t = new Thread(new Runnable() {
-			public void run() {
-				try {
-					Thread.sleep(1000);
-				} catch (Exception e) {
-				}
-				
-				mCamera.takePicture(null, null, mPictureCallback);
-			}
-		});
-		t.start();
-	}
 	
 	private void loadFromGallery() {
+		isCameraPaused = true;
 		mCamera.stopPreview();
 		
 		Intent intent = new Intent();
@@ -295,19 +296,20 @@ public class MahjongTileRecognizerActivity extends Activity {
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		if(requestCode == REQUEST_GALLERY && resultCode == RESULT_OK) {
+			Log.d("TAG", "Intent returned result");
 			try {
 				InputStream in = getContentResolver().openInputStream(data.getData());
 				Bitmap bitmap = BitmapFactory.decodeStream(in);
+				Log.d("TAG", "decoded bitmap");
 				
 				onComputePicture(bitmap);
 			} catch (Exception e) {
 				
 			}
-			isCameraPaused = false;
-			mCamera.startPreview();
 		}
 	}
-	
+		
+	// helper methods
 	private void saveImageToSDCard(Bitmap bitmap) {
 		if(!isSDCardMounted()) {
 			Log.d("TAG", "SDCard is not mounted");

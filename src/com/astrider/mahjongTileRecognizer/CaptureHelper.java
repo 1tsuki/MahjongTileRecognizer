@@ -81,66 +81,76 @@ public class CaptureHelper {
 	}
 	
 	// static methods (tools)
-	public static Bitmap effectDrawEdges(Bitmap bitmap) {		
+	public static List<MatOfPoint> getContours(Bitmap bitmap) {
 		Mat src = new Mat();
 		Mat gray = new Mat();
 		Mat dst = new Mat();
 		Utils.bitmapToMat(bitmap, src);
-
-		int min_x_thresh = (int) (src.rows() * 0.1);
-		int max_x_thresh = (int) (src.rows() * 0.9);
-		int min_y_thresh = (int) (src.cols() * 0.1);
-		int max_y_thresh = (int) (src.cols() * 0.9);
 		
 		Imgproc.cvtColor(src , gray, Imgproc.COLOR_RGB2GRAY); 
 		Imgproc.threshold(gray, dst, 0, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
 		Mat hierarchy = new Mat();
-		List<MatOfPoint> contours =new ArrayList<MatOfPoint>(100);
+		List<MatOfPoint> contours = new ArrayList<MatOfPoint>(100);
 		Imgproc.findContours(dst, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_NONE);
-		Imgproc.cvtColor(gray , gray, Imgproc.COLOR_GRAY2BGRA,4);
 		
-//		Imgproc.drawContours(gray, contours, -1, new Scalar(255, 0, 0), 1);
-		if(contours.size() > 0) {
-			Mat first = contours.get(0);
-			double min_x = first.get(0, 0)[0];
-			double max_x = first.get(0, 0)[0];
-			double min_y = first.get(0, 0)[1];
-			double max_y = first.get(0, 0)[1];
-			double x, y, tmp[];
-			for (int i = 0; i < contours.size(); i++) {
-				Mat m = contours.get(i);
-
-				if(m.rows() > 80) {
-					for (int j = 0; j < m.rows(); j++) {
-						tmp = m.get(j, 0);
-						x = tmp[0];
-						y = tmp[1];
-						Log.d("TAG", String.valueOf(x) + " " + String.valueOf(y));
-						
-						if(min_x_thresh < x && x < min_x) {
-							min_x = x;
-						}
-						if(max_x < x && x < max_x_thresh ) {
-							max_x = x;
-						}
-						if(min_y_thresh < y && y < min_y) {
-							min_y = y;
-						}
-						if(max_y < y && y < max_y_thresh) {
-							max_y = y;
-						}
-					}
-				}
-			}
-			
-			Log.d("TAG", String.valueOf(min_x) + " " + String.valueOf(max_x) + " " + String.valueOf(max_y) + " " + String.valueOf(min_y));
-			Mat sub = src.submat(new Rect(new Point(min_x, min_y), new Point(max_x, max_y)));
-			Utils.matToBitmap(sub, bitmap);
-			
+		return contours;
+	}
+	
+	public static Bitmap drawContours(Bitmap bitmap, List<MatOfPoint> contours) {
+		Mat src = new Mat();
+		Utils.bitmapToMat(bitmap, src);
+		Imgproc.drawContours(src, contours, -1, new Scalar(255, 0, 0), 1);
+		
+		Bitmap dst = Bitmap.createBitmap(src.width(), src.height(), Bitmap.Config.ARGB_8888);
+		Utils.matToBitmap(src, dst);
+		return dst;
+	}
+	
+	public static Bitmap effectChopEdges(Bitmap bitmap, List<MatOfPoint> contours) {
+		if(contours.size() < 1) {
+			return bitmap;
 		}
 		
-
-		return bitmap;
+		Mat src = new Mat();
+		Utils.bitmapToMat(bitmap, src);
+		int min_x_thresh = (int) (src.rows() * 0.01);
+		int max_x_thresh = (int) (src.rows() * 0.01);
+		int min_y_thresh = (int) (src.cols() * 0.01);
+		int max_y_thresh = (int) (src.cols() * 0.01);
+		
+		Point pt1 = new Point(src.rows() / 2, src.cols() / 2);
+		Point pt2 = new Point(src.rows() / 2, src.cols() / 2);
+		double x, y, tmp[];
+		for (int i = 0; i < contours.size(); i++) {
+			Mat m = contours.get(i);
+			for (int j = 0; j < m.rows(); j++) {
+				tmp = m.get(j, 0);
+				x = tmp[0];
+				y = tmp[1];
+				
+				if(min_x_thresh < x && x < pt1.x) {
+					pt1.x = x;
+				}
+				if(pt2.x < x && x < max_x_thresh ) {
+					pt2.x = x;
+				}
+				if(min_y_thresh < y && y < pt1.y) {
+					pt1.y = y;
+				}
+				if(pt2.y < y && y < max_y_thresh) {
+					pt2.y = y;
+				}
+			}
+		}
+			
+		Mat sub = src.submat(new Rect(pt1, pt2));
+		if(sub.width() <= 0 || sub.height() <= 0) {
+			return bitmap;
+		}
+		
+		Bitmap chopped = Bitmap.createBitmap(sub.width(), sub.height(), Bitmap.Config.ARGB_8888);
+		Utils.matToBitmap(sub, chopped);
+		return chopped;
 	}
 	
 	public static Bitmap effectChopBoundingRect(Bitmap bitmap) {
