@@ -13,6 +13,7 @@ import android.view.View;
 public class OverlayView extends View {
 	Paint paint = new Paint();
 	String[] tiles;
+	String[] predetetionResult;
 	String currentMethod;
 	float[] similarities;
 	float[][] coords;
@@ -41,6 +42,13 @@ public class OverlayView extends View {
 	public void setResult(String[] tiles, float[] similarities) {
 		this.tiles = tiles;
 		this.similarities = similarities;
+		invalidate();
+	}
+	
+	public void setResult(String[] tiles, float[] similarities, String[] predetectionResult) {
+		this.tiles = tiles;
+		this.similarities = similarities;
+		this.predetetionResult = predetectionResult;
 		invalidate();
 	}
 	
@@ -105,8 +113,11 @@ public class OverlayView extends View {
 			// round up
 			BigDecimal bd = new BigDecimal(similarities[i]);
 			BigDecimal rounded = bd.setScale(3, BigDecimal.ROUND_HALF_UP);
-			
 			canvas.drawText(String.valueOf(rounded.doubleValue()), x, y + 20, paint);
+			
+			if(predetetionResult[i] != null) {
+				canvas.drawText(predetetionResult[i], x, y + 40, paint);
+			}
 		}
 		invalidate();
 	}

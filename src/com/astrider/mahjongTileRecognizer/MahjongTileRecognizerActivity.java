@@ -16,6 +16,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
 import android.hardware.Camera;
@@ -189,26 +190,50 @@ public class MahjongTileRecognizerActivity extends Activity {
 			// decode picture and do things
 			Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
 			saveImageToSDCard(bitmap);
-			onPictureLoaded(bitmap);		
+			onComputePicture(bitmap);		
 		}
 	};
 	
-	private void onPictureLoaded(Bitmap bitmap) {
-		helper.setSourceImage(bitmap);
+
+	private void onComputePicture(Bitmap bitmap) {
 		try {
-			helper.identifyTiles();
+			Log.d("TAG", "set source image");
+			helper.setSourceImage(bitmap);
+			String[] tiles = helper.identifyTiles();
+			float[] similarities = helper.getSimilarities();
+			
+			Bitmap[] slicedImages = helper.getSlicedImages();
+			Log.d("TAG", "saving sliced images");
+			String[] predetectionResult = new String[CaptureHelper.TILE_NUM];
+			String[] colors = {"Red", "Green", "Blue"};
+			for (int i=0; i < slicedImages.length; i++) {
+				switch (CaptureHelper.getMainColor(slicedImages[i])) {
+					case Color.RED:
+						predetectionResult[i] = "Red";
+						break;
+						
+					case Color.GREEN:
+						predetectionResult[i] = "Green";
+						
+					case Color.BLUE:
+						predetectionResult[i] = "Blue";
+	
+					default:
+						break;
+				}
+				slicedImages[i] = CaptureHelper.effectDrawBoundingRect(slicedImages[i]);
+				saveImageToSDCard(slicedImages[i]);
+			}
+			mOverlayView.setResult(tiles, similarities, predetectionResult);
+			
+//			mOverlayView.setResult(tiles, similarities);
 		} catch (Exception e) {
+			Log.d("TAG", "caught exception");
 			e.printStackTrace();
 		}
 		
-		String[] tiles = helper.getDetectedTileNames();
-		float[] similarities = helper.getSimilarities();
-		
-		for (String tile : tiles) {
-			Log.d("TAG", tile);
-		}
-		
-		mOverlayView.setResult(tiles, similarities);
+		bitmap.recycle();
+		bitmap = null;
 	}
 
 	private SurfaceHolder.Callback mSurfaceHolderCallback = new SurfaceHolder.Callback() {
@@ -273,7 +298,7 @@ public class MahjongTileRecognizerActivity extends Activity {
 				InputStream in = getContentResolver().openInputStream(data.getData());
 				Bitmap bitmap = BitmapFactory.decodeStream(in);
 				
-				onPictureLoaded(bitmap);
+				onComputePicture(bitmap);
 			} catch (Exception e) {
 				
 			}
