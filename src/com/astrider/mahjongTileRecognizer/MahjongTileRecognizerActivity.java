@@ -249,6 +249,7 @@ public class MahjongTileRecognizerActivity extends Activity {
 		
 		try {
 			helper.setSourceImage(bitmap);
+			
 			long time = helper.identifyTiles();
 			String[] tiles = helper.getDetectedTileNames();
 			float[] similarities = helper.getSimilarities();
