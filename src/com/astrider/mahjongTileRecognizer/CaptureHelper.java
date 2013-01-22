@@ -27,7 +27,6 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.graphics.Matrix;
 import android.util.Log;
 
 public class CaptureHelper {
@@ -389,18 +388,22 @@ public class CaptureHelper {
 		long time;
 		switch (methodType) {
 			case METHOD_EUCLIDEANDISTANCE:
+				Log.d("TAG", "method:" + "euc");
 				time = euclideanDistanceDetection();
 				break;
 				
 			case METHOD_ORB:
+				Log.d("TAG", "method:" + "orb");
 				time = orbDetection();
 				break;
 				
 			case METHOD_ORB_ADVANCED:
+				Log.d("TAG", "method:" + "aorb");
 				time = orbAdvancedDetection();
 				break;
 	
 			default:
+				Log.d("TAG", "method:" + "err");
 				time = orbAdvancedDetection();
 				break;
 		}
@@ -857,4 +860,4 @@ public class CaptureHelper {
 		this.methodType = methodType;
 		loadTemplates();
 	}
-	}
+}
