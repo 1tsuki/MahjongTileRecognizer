@@ -32,13 +32,13 @@ import android.util.Log;
 public class CaptureHelper {
 	public static final int DEFAULT_WIDTH = 63;
 	public static final int DEFAULT_HEIGHT = 84;
-	public static final int TILE_NUM = 5;
+	public static final int TILE_NUM = 9;
 	public static final int TEMPLATE_NUM = 33;
 	public static final int THRESHOLD = 45;
 	public static final int METHOD_EUCLIDEANDISTANCE = 0;
 	public static final int METHOD_ORB = 1;
 	public static final int METHOD_ORB_ADVANCED = 2;
-	public static final int CONTRAST_LEVEL = 96;
+	public static final int CONTRAST_LEVEL = 80;
 	
 	Resources res;
 	String packageName;
@@ -46,7 +46,7 @@ public class CaptureHelper {
 	boolean isSourceLoaded = false;
 	int methodType = METHOD_ORB_ADVANCED;
 	
-	Bitmap[] templateImages = null;
+	int[] templateImageIds = null;
 	DescriptorMatcher matcher = null;
 	DescriptorMatcher rMatcher = null;
 	DescriptorMatcher gMatcher = null;
@@ -112,46 +112,80 @@ public class CaptureHelper {
 		
 		Mat src = new Mat();
 		Utils.bitmapToMat(bitmap, src);
-		int padding = (int) (src.width() * 0.1);
+		// âèÇ©ÇÁ5ÅìÇÃîÕàÕì‡Ç…dotÇéùÇ¬ó÷äsê¸ÇÕèúãé
+		int padding = (int) (src.width() * 0.05);
 		int min_x_thresh = padding;
 		int max_x_thresh = src.width() - padding;
 		int min_y_thresh = padding;
 		int max_y_thresh = src.height() - padding;
 		
-		Point pt1 = new Point(src.width() / 2, src.height() / 2);
-		Point pt2 = new Point(src.width() / 2, src.height() / 2);
+		Point min = new Point(src.width() / 2, src.height() / 2);
+		Point tmpMin = new Point(src.width() / 2, src.height() / 2);
+		Point max = new Point(src.width() / 2, src.height() / 2);
+		Point tmpMax = new Point(src.width() / 2, src.height() / 2);
 		double x, y, tmp[];
+		boolean ignoreFlag = false;
+		
+		// check every contours
 		for (int i = 0; i < contours.size(); i++) {
 			Mat m = contours.get(i);
+			
+			// reset values
+			ignoreFlag = false;
+			tmpMin.x = tmpMax.x = src.width() / 2;
+			tmpMin.y = tmpMax.y = src.height() / 2;
+			
+			// check all dots in contour
 			for (int j = 0; j < m.rows(); j++) {
 				tmp = m.get(j, 0);
-				x = tmp[0];
-				y = tmp[1];
+				x = tmp[0]; y = tmp[1];
 				
-				if(min_x_thresh < x && x < pt1.x) {
-					pt1.x = x;
+				// if dot is within threshold, break and skip this contour
+				if(x < min_x_thresh || max_x_thresh < x || y < min_y_thresh || max_y_thresh < y) {
+					ignoreFlag = true;
+					break;
 				}
-				if(min_y_thresh < y && y < pt1.y) {
-					pt1.y = y;
+				
+				// check each dot is min / max
+				if(x < tmpMin.x) {
+					tmpMin.x = x;
 				}
-				if(pt2.x < x && x < max_x_thresh ) {
-					pt2.x = x;
+				if(y < tmpMin.y) {
+					tmpMin.y = y;
 				}
-				if(pt2.y < y && y < max_y_thresh) {
-					pt2.y = y;
+				if(tmpMax.x < x) {
+					tmpMax.x = x;
+				}
+				if(tmpMax.y < y) {
+					tmpMax.y = y;
+				}
+			}
+			
+			if(!ignoreFlag) {
+				if(tmpMin.x < min.x) {
+					min.x = tmpMin.x;
+				}
+				if(tmpMin.y < min.y) {
+					min.y = tmpMin.y;
+				}
+				if(max.x < tmpMax.x) {
+					max.x = tmpMax.x;
+				}
+				if(max.y < tmpMax.y) {
+					max.y = tmpMax.y;
 				}
 			}
 		}
 			
-		Mat sub = src.submat(new Rect(pt1, pt2));
+		Mat sub = src.submat(new Rect(min, max));
 		if(sub.width() == 0 || sub.height() == 0) {			
 			return bitmap;
 		}
 		
-		Log.d("TAG", "Contour x:" + String.valueOf(pt1.x) + " to " + String.valueOf(pt2.x) + " y:" + String.valueOf(pt1.y) + " to " + String.valueOf(pt2.y));
-		Bitmap chopped = Bitmap.createBitmap(sub.width(), sub.height(), Bitmap.Config.ARGB_8888);
-		Utils.matToBitmap(sub, chopped);
-		return chopped;
+		Log.d("TAG", "Contour x:" + String.valueOf(min.x) + " to " + String.valueOf(max.x) + " y:" + String.valueOf(min.y) + " to " + String.valueOf(max.y));
+		Bitmap dst = Bitmap.createBitmap(sub.width(), sub.height(), Bitmap.Config.ARGB_8888);
+		Utils.matToBitmap(sub, dst);
+		return dst;
 	}
 	
 	public static Bitmap chopWithBoundingRect(Bitmap bitmap) {
@@ -509,34 +543,28 @@ public class CaptureHelper {
 	// helper methods for loading resource
 	private void setupEuclidianDistanceTemplates() {
 		Log.d("TAG", "setupEuclidianDistanceTemplates");
-//		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9,
-//				R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,
-//				R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
-//				R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
-		int[] ids = {R.drawable.euc_w1, R.drawable.euc_w2, R.drawable.euc_w3, R.drawable.euc_w4, R.drawable.euc_w5, R.drawable.euc_w6, R.drawable.euc_w7, R.drawable.euc_w8, R.drawable.euc_w9,
-					R.drawable.euc_p1, R.drawable.euc_p2, R.drawable.euc_p3, R.drawable.euc_p4, R.drawable.euc_p5, R.drawable.euc_p6, R.drawable.euc_p7, R.drawable.euc_p8, R.drawable.euc_p9,
-					R.drawable.euc_s1, R.drawable.euc_s2, R.drawable.euc_s3, R.drawable.euc_s4, R.drawable.euc_s5, R.drawable.euc_s6, R.drawable.euc_s7, R.drawable.euc_s8, R.drawable.euc_s9,
-					R.drawable.euc_j1, R.drawable.euc_j2, R.drawable.euc_j3, R.drawable.euc_j4, R.drawable.euc_j5, R.drawable.euc_j6};
-		templateImages = new Bitmap[ids.length];
-		
-		for (int i = 0; i<ids.length; i++) {
-			Bitmap src = BitmapFactory.decodeResource(res, ids[i]);
-			Bitmap converted = effectChangeResolution(src, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-			templateImages[i] = converted;
-		}
+		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9,
+				R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,
+				R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
+				R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
+//		int[] ids = {R.drawable.euc_w1, R.drawable.euc_w2, R.drawable.euc_w3, R.drawable.euc_w4, R.drawable.euc_w5, R.drawable.euc_w6, R.drawable.euc_w7, R.drawable.euc_w8, R.drawable.euc_w9,
+//					R.drawable.euc_p1, R.drawable.euc_p2, R.drawable.euc_p3, R.drawable.euc_p4, R.drawable.euc_p5, R.drawable.euc_p6, R.drawable.euc_p7, R.drawable.euc_p8, R.drawable.euc_p9,
+//					R.drawable.euc_s1, R.drawable.euc_s2, R.drawable.euc_s3, R.drawable.euc_s4, R.drawable.euc_s5, R.drawable.euc_s6, R.drawable.euc_s7, R.drawable.euc_s8, R.drawable.euc_s9,
+//					R.drawable.euc_j1, R.drawable.euc_j2, R.drawable.euc_j3, R.drawable.euc_j4, R.drawable.euc_j5, R.drawable.euc_j6};
+		templateImageIds = ids;
 	}
 	
 	private void setupORBMatcher() {
 		Log.d("TAG", "setupORBMatcher");
 		matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-//		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
-//				R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,  
-//				R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
-//				R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
-		int[] ids = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
-					R.drawable.orb_p1, R.drawable.orb_p2, R.drawable.orb_p3, R.drawable.orb_p4, R.drawable.orb_p5, R.drawable.orb_p6, R.drawable.orb_p7, R.drawable.orb_p8, R.drawable.orb_p9,  
-					R.drawable.orb_s1, R.drawable.orb_s2, R.drawable.orb_s3, R.drawable.orb_s4, R.drawable.orb_s5, R.drawable.orb_s6, R.drawable.orb_s7, R.drawable.orb_s8, R.drawable.orb_s9,
-					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j5, R.drawable.orb_j6};
+		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
+				R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,  
+				R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
+				R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
+//		int[] ids = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
+//					R.drawable.orb_p1, R.drawable.orb_p2, R.drawable.orb_p3, R.drawable.orb_p4, R.drawable.orb_p5, R.drawable.orb_p6, R.drawable.orb_p7, R.drawable.orb_p8, R.drawable.orb_p9,  
+//					R.drawable.orb_s1, R.drawable.orb_s2, R.drawable.orb_s3, R.drawable.orb_s4, R.drawable.orb_s5, R.drawable.orb_s6, R.drawable.orb_s7, R.drawable.orb_s8, R.drawable.orb_s9,
+//					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j5, R.drawable.orb_j6};
 		List<Mat> descriptors = getDescriptors(ids);
 		matcher.add(descriptors);
 	}
@@ -546,25 +574,25 @@ public class CaptureHelper {
 		rMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
 		gMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
 		bMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-//		int[] rIds = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
-//					R.drawable.p6, R.drawable.p7, 
-//					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j6};
+		int[] rIds = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
+					R.drawable.p6, R.drawable.p7, 
+					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j6};
+		
+		int[] gIds = {R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
+					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, };
+		
+		int[] bIds = {R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p8, R.drawable.p9,
+					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, };
+		
+//		int[] rIds = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
+//					R.drawable.orb_p6, R.drawable.orb_p7, 
+//					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j6};
 //		
-//		int[] gIds = {R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
-//					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, };
+//		int[] gIds = {R.drawable.orb_s1, R.drawable.orb_s2, R.drawable.orb_s3, R.drawable.orb_s4, R.drawable.orb_s5, R.drawable.orb_s6, R.drawable.orb_s7, R.drawable.orb_s8, R.drawable.orb_s9,
+//					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j5, };
 //		
-//		int[] bIds = {R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p8, R.drawable.p9,
-//					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, };
-		
-		int[] rIds = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
-					R.drawable.orb_p6, R.drawable.orb_p7, 
-					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j6};
-		
-		int[] gIds = {R.drawable.orb_s1, R.drawable.orb_s2, R.drawable.orb_s3, R.drawable.orb_s4, R.drawable.orb_s5, R.drawable.orb_s6, R.drawable.orb_s7, R.drawable.orb_s8, R.drawable.orb_s9,
-					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j5, };
-		
-		int[] bIds = {R.drawable.orb_p1, R.drawable.orb_p2, R.drawable.orb_p3, R.drawable.orb_p4, R.drawable.orb_p5, R.drawable.orb_p8, R.drawable.orb_p9,
-					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, };
+//		int[] bIds = {R.drawable.orb_p1, R.drawable.orb_p2, R.drawable.orb_p3, R.drawable.orb_p4, R.drawable.orb_p5, R.drawable.orb_p8, R.drawable.orb_p9,
+//					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, };
 		
 		// array to contain descriptors
 		List<Mat> rDescriptors = getDescriptors(rIds);
@@ -585,22 +613,30 @@ public class CaptureHelper {
 		// prepare variables
 		double tmpVal = 0;
 		double minDiff = 100;
-		int id = 0;
+		int detected = 0;
 		
 		// compare target with each templates
 		for (int i = 0; i < slicedImages.length; i++) {
 			Bitmap target = slicedImages[i];
+			
+			// cut out image
 			List<MatOfPoint> contours = getContours(target);
 			Bitmap dst = chopWithContours(target, contours);
-			for (int j = 0; j < templateImages.length; j++) {
-				tmpVal = getEuclideanDistance(templateImages[j], dst);
+			
+			// compare with templates
+			for (int j = 0; j < templateImageIds.length; j++) {
+				Bitmap template = BitmapFactory.decodeResource(res, templateImageIds[j]);
+				tmpVal = getEuclideanDistance(template, dst);
 				if(tmpVal < minDiff) {
 					minDiff = tmpVal;
-					id = j;
+					detected = j;
 				}
+				
+				template.recycle();
+				template = null;
 			}
 			
-			detectedTileIds[i] = id;
+			detectedTileIds[i] = detected;
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
 			similarities[i] = (float) (100 - minDiff);
 		}
@@ -727,15 +763,18 @@ public class CaptureHelper {
 	// detect helpers
 	private double getEuclideanDistance(Bitmap src, Bitmap target) {
 		// check and convert resolution
-		src = effectChangeResolution(src, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-		target = effectChangeResolution(target, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+		int width = target.getWidth();
+		int height = target.getHeight();
+		
+		// change to same resolution
+		src = effectChangeResolution(src, width, height);
 		
 		// get pixels
-		int[] srcPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
-		src.getPixels(srcPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+		int[] srcPixels = new int[width * height];
+		src.getPixels(srcPixels, 0, width, 0, 0, width, height);
 
-		int[] targetPixels = new int[DEFAULT_WIDTH * DEFAULT_HEIGHT];
-		target.getPixels(targetPixels, 0, DEFAULT_WIDTH, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+		int[] targetPixels = new int[width * height];
+		target.getPixels(targetPixels, 0, width, 0, 0, width, height);
 		
 		// calculate diff
 		int srcColor = 0;
@@ -747,22 +786,25 @@ public class CaptureHelper {
 		int gDiffSum = 0;
 		int bDiffSum = 0;
 		
-		for (int x = 0; x < DEFAULT_WIDTH; x++) {
-			for (int y = 0; y < DEFAULT_HEIGHT; y++) {
-				srcColor = srcPixels[x + y*DEFAULT_WIDTH];
-				targetColor = targetPixels[x + y*DEFAULT_WIDTH];
-				
-				rDiff = Color.red(srcColor) - Color.red(targetColor);
-				gDiff = Color.green(srcColor) - Color.green(targetColor);
-				bDiff = Color.blue(srcColor) - Color.blue(targetColor);
-				
-				rDiffSum += Math.pow(rDiff, 2);
-				rDiffSum += Math.pow(gDiff, 2);
-				rDiffSum += Math.pow(bDiff, 2);
+		for (int x = 0; x < width; x++) {
+			for (int y = 0; y < height; y++) {
+				try {
+					srcColor = srcPixels[x + y*width];
+					targetColor = targetPixels[x + y*height];
+					
+					rDiff = Color.red(srcColor) - Color.red(targetColor);
+					gDiff = Color.green(srcColor) - Color.green(targetColor);
+					bDiff = Color.blue(srcColor) - Color.blue(targetColor);
+					
+					rDiffSum += Math.pow(rDiff, 2);
+					rDiffSum += Math.pow(gDiff, 2);
+					rDiffSum += Math.pow(bDiff, 2);
+				} catch (Exception e) {
+				}
 			}
 		}
 		
-		double maxDiff = Math.sqrt(DEFAULT_WIDTH * DEFAULT_HEIGHT * Math.pow(255, 2));
+		double maxDiff = Math.sqrt(width * height * Math.pow(255, 2));
 		double denominator = 3 * maxDiff;
 		double numerator = Math.sqrt(rDiffSum) + Math.sqrt(gDiffSum) + Math.sqrt(bDiffSum);
 		double difference = numerator / denominator * 100;
@@ -834,28 +876,11 @@ public class CaptureHelper {
 	
 	public void setMethod(int methodType) {
 		// clear current items
-		switch (this.methodType) {
-			case METHOD_EUCLIDEANDISTANCE:
-				for (Bitmap image : templateImages) {
-					image.recycle();
-					image = null;
-				}
-				break;
-				
-			case METHOD_ORB:
-				matcher = null;
-				break;
-				
-			case METHOD_ORB_ADVANCED:
-				rMatcher = null;
-				gMatcher = null;
-				bMatcher = null;
-				
-				break;
-	
-			default:
-				break;
-		}
+		templateImageIds = null;
+		matcher = null;
+		rMatcher = null;
+		gMatcher = null;
+		bMatcher = null;
 		
 		this.methodType = methodType;
 		loadTemplates();

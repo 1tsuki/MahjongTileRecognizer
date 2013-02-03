@@ -4,10 +4,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.MatOfPoint;
 
 import android.app.Activity;
 import android.content.ContentResolver;
@@ -113,7 +115,7 @@ public class MahjongTileRecognizerActivity extends Activity {
 
 			// decode picture and do things
 			Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-			saveImageToSDCard(bitmap);
+//			saveImageToSDCard(bitmap);
 			analyzePicture(bitmap);
 		}
 	};
@@ -220,7 +222,7 @@ public class MahjongTileRecognizerActivity extends Activity {
     	}
     	
     	// initialize helper
-    	helper = new CaptureHelper(getResources(), getPackageName(), CaptureHelper.METHOD_ORB);
+    	helper = new CaptureHelper(getResources(), getPackageName(), CaptureHelper.METHOD_EUCLIDEANDISTANCE);
     	mOverlayView.setCurrentMethod(helper.getCurrentMethod());
 	}
 
@@ -255,6 +257,16 @@ public class MahjongTileRecognizerActivity extends Activity {
 			float[] similarities = helper.getSimilarities();
 			String[] mainColors = helper.getMainColors();
 			
+//			Bitmap[] slicedImages = helper.getSlicedImages();
+//			List<MatOfPoint> contours = null;
+//			for (Bitmap image : slicedImages) {
+//				contours = CaptureHelper.getContours(image);
+//				
+//				// save contour images
+//				saveImageToSDCard(image);
+//				saveImageToSDCard(CaptureHelper.drawContours(image, contours));
+//				saveImageToSDCard(CaptureHelper.chopWithContours(image, contours));
+//			}
 			helper.recycleSlicedImages();
 			
 			mOverlayView.setResult(time, tiles, similarities, mainColors);
