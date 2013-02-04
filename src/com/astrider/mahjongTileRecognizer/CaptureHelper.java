@@ -44,13 +44,16 @@ public class CaptureHelper {
 	String packageName;
 	
 	boolean isSourceLoaded = false;
-	int methodType = METHOD_ORB_ADVANCED;
+	int methodType = METHOD_ORB;
 	
-	int[] templateImageIds = null;
+	int[] templateImageIds = 
+		{R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9,
+		 R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,
+		 R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
+		 R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
 	DescriptorMatcher matcher = null;
 	DescriptorMatcher rMatcher = null;
-	DescriptorMatcher gMatcher = null;
-	DescriptorMatcher bMatcher = null;
+	DescriptorMatcher otherMatcher = null;
 	FeatureDetector detector = FeatureDetector.create(FeatureDetector.ORB);
 	DescriptorExtractor extractor = DescriptorExtractor.create(DescriptorExtractor.ORB);
 	
@@ -233,24 +236,6 @@ public class CaptureHelper {
 	
 	public static Bitmap effectChangeResolution(Bitmap src, int dstWidth, int dstHeight) {
 		return Bitmap.createScaledBitmap(src, dstWidth, dstHeight, false);
-		// check current resolution
-//		int srcWidth = src.getWidth();
-//		int srcHeight = src.getHeight();
-//		
-//		// return if convert is not needed
-//		if(srcWidth == dstWidth && srcHeight == dstHeight) {
-//			return src;
-//		}
-//		
-//		
-//		
-//		// convert resolution
-//		Matrix matrix = new Matrix();
-//		matrix.postScale(dstWidth / srcWidth, dstHeight / srcHeight);
-//		Log.d("TAG", String.valueOf(dstWidth) + " " + String.valueOf(dstHeight) + " " + String.valueOf(srcWidth) + " " + String.valueOf(srcHeight));
-//		Bitmap dst = Bitmap.createBitmap(src, 0, 0, srcWidth, srcHeight, matrix, true);
-//		
-//		return dst;
 	}
 	
 	public static Bitmap effectWhiten(Bitmap bitmap, int threshold) {
@@ -523,18 +508,8 @@ public class CaptureHelper {
 			}
 		}
 		
-		if(mainColor == "GREEN") {
-			id = srcId + 18;			
-		}
-		
-		if(mainColor == "BLUE") {
-			if(srcId < 5) {
-				id = srcId + 9;
-			} else if (srcId < 7) {
-				id = srcId + 11;
-			} else {
-				id = srcId + 20;
-			}
+		if(mainColor == "GREEN" || mainColor == "BLUE") {
+			id = srcId + 9;
 		}
 		
 		return id;
@@ -543,66 +518,33 @@ public class CaptureHelper {
 	// helper methods for loading resource
 	private void setupEuclidianDistanceTemplates() {
 		Log.d("TAG", "setupEuclidianDistanceTemplates");
-		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9,
-				R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,
-				R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
-				R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
-//		int[] ids = {R.drawable.euc_w1, R.drawable.euc_w2, R.drawable.euc_w3, R.drawable.euc_w4, R.drawable.euc_w5, R.drawable.euc_w6, R.drawable.euc_w7, R.drawable.euc_w8, R.drawable.euc_w9,
-//					R.drawable.euc_p1, R.drawable.euc_p2, R.drawable.euc_p3, R.drawable.euc_p4, R.drawable.euc_p5, R.drawable.euc_p6, R.drawable.euc_p7, R.drawable.euc_p8, R.drawable.euc_p9,
-//					R.drawable.euc_s1, R.drawable.euc_s2, R.drawable.euc_s3, R.drawable.euc_s4, R.drawable.euc_s5, R.drawable.euc_s6, R.drawable.euc_s7, R.drawable.euc_s8, R.drawable.euc_s9,
-//					R.drawable.euc_j1, R.drawable.euc_j2, R.drawable.euc_j3, R.drawable.euc_j4, R.drawable.euc_j5, R.drawable.euc_j6};
-		templateImageIds = ids;
 	}
 	
 	private void setupORBMatcher() {
 		Log.d("TAG", "setupORBMatcher");
 		matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-		int[] ids = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
-				R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,  
-				R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
-				R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
-//		int[] ids = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
-//					R.drawable.orb_p1, R.drawable.orb_p2, R.drawable.orb_p3, R.drawable.orb_p4, R.drawable.orb_p5, R.drawable.orb_p6, R.drawable.orb_p7, R.drawable.orb_p8, R.drawable.orb_p9,  
-//					R.drawable.orb_s1, R.drawable.orb_s2, R.drawable.orb_s3, R.drawable.orb_s4, R.drawable.orb_s5, R.drawable.orb_s6, R.drawable.orb_s7, R.drawable.orb_s8, R.drawable.orb_s9,
-//					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j5, R.drawable.orb_j6};
-		List<Mat> descriptors = getDescriptors(ids);
+		List<Mat> descriptors = getDescriptors(templateImageIds);
 		matcher.add(descriptors);
 	}
 	
 	private void setupORBAdvancedMatchers() {
 		Log.d("TAG", "setupORBAdvancedMatcher");
 		rMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-		gMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-		bMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+		otherMatcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
 		int[] rIds = {R.drawable.w1, R.drawable.w2, R.drawable.w3, R.drawable.w4, R.drawable.w5, R.drawable.w6, R.drawable.w7, R.drawable.w8, R.drawable.w9, 
-					R.drawable.p6, R.drawable.p7, 
-					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j6};
+					  R.drawable.p6, R.drawable.p7, R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j6};
 		
-		int[] gIds = {R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
-					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, };
-		
-		int[] bIds = {R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p8, R.drawable.p9,
-					R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, };
-		
-//		int[] rIds = {R.drawable.orb_w1, R.drawable.orb_w2, R.drawable.orb_w3, R.drawable.orb_w4, R.drawable.orb_w5, R.drawable.orb_w6, R.drawable.orb_w7, R.drawable.orb_w8, R.drawable.orb_w9, 
-//					R.drawable.orb_p6, R.drawable.orb_p7, 
-//					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j6};
-//		
-//		int[] gIds = {R.drawable.orb_s1, R.drawable.orb_s2, R.drawable.orb_s3, R.drawable.orb_s4, R.drawable.orb_s5, R.drawable.orb_s6, R.drawable.orb_s7, R.drawable.orb_s8, R.drawable.orb_s9,
-//					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, R.drawable.orb_j5, };
-//		
-//		int[] bIds = {R.drawable.orb_p1, R.drawable.orb_p2, R.drawable.orb_p3, R.drawable.orb_p4, R.drawable.orb_p5, R.drawable.orb_p8, R.drawable.orb_p9,
-//					R.drawable.orb_j1, R.drawable.orb_j2, R.drawable.orb_j3, R.drawable.orb_j4, };
+		int[] otherIds = {R.drawable.p1, R.drawable.p2, R.drawable.p3, R.drawable.p4, R.drawable.p5, R.drawable.p6, R.drawable.p7, R.drawable.p8, R.drawable.p9,
+						  R.drawable.s1, R.drawable.s2, R.drawable.s3, R.drawable.s4, R.drawable.s5, R.drawable.s6, R.drawable.s7, R.drawable.s8, R.drawable.s9,
+						  R.drawable.j1, R.drawable.j2, R.drawable.j3, R.drawable.j4, R.drawable.j5, R.drawable.j6};
 		
 		// array to contain descriptors
 		List<Mat> rDescriptors = getDescriptors(rIds);
-		List<Mat> gDescriptors = getDescriptors(gIds);
-		List<Mat> bDescriptors = getDescriptors(bIds);
+		List<Mat> otherDescriptors = getDescriptors(otherIds);
 		
 		// add descriptors to matcher
 		rMatcher.add(rDescriptors);
-		gMatcher.add(gDescriptors);
-		bMatcher.add(bDescriptors);
+		otherMatcher.add(otherDescriptors);
 	}
 	
 	// detectors
@@ -611,34 +553,34 @@ public class CaptureHelper {
 		long start = System.currentTimeMillis();
 		
 		// prepare variables
-		double tmpVal = 0;
+		Bitmap target = null;
+		Bitmap template = null;
+		double tmpDiff = 0;
 		double minDiff = 100;
 		int detected = 0;
 		
 		// compare target with each templates
 		for (int i = 0; i < slicedImages.length; i++) {
-			Bitmap target = slicedImages[i];
-			
-			// cut out image
-			List<MatOfPoint> contours = getContours(target);
-			Bitmap dst = chopWithContours(target, contours);
+			target = chopWithContours(slicedImages[i], getContours(slicedImages[i]));
 			
 			// compare with templates
 			for (int j = 0; j < templateImageIds.length; j++) {
-				Bitmap template = BitmapFactory.decodeResource(res, templateImageIds[j]);
-				tmpVal = getEuclideanDistance(template, dst);
-				if(tmpVal < minDiff) {
-					minDiff = tmpVal;
+				template = BitmapFactory.decodeResource(res, templateImageIds[j]);
+				tmpDiff = getEuclideanDistance(target, template);
+				if(tmpDiff < minDiff) {
+					minDiff = tmpDiff;
 					detected = j;
 				}
 				
 				template.recycle();
-				template = null;
 			}
-			
 			detectedTileIds[i] = detected;
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
 			similarities[i] = (float) (100 - minDiff);
+			
+			// reset values
+			minDiff = 100;
+			target.recycle();
 		}
 		
 		long end = System.currentTimeMillis();
@@ -651,7 +593,6 @@ public class CaptureHelper {
 		for (int i=0; i<slicedImages.length; i++) {
 			// load next sliced tile image
 			Bitmap target = slicedImages[i];
-			
 			HashMap<String, Number> result = matchImage(matcher, target);
 			
 			detectedTileIds[i] = (Integer) result.get("id");
@@ -667,31 +608,26 @@ public class CaptureHelper {
 		Log.d("TAG", "Runninng orb Advanced Detection");
 		
 		long start = System.currentTimeMillis();
-		if(mainColors == null) {
-			getMainColors();
-		}
+		getMainColors();
 		
 		for (int i=0; i<slicedImages.length; i++) {
-			// load next sliced tile image
-			Bitmap target = slicedImages[i];
+			// detect main color
 			String mainColor = mainColors[i];
-			
 			DescriptorMatcher matcher = null; 
 			if (mainColor == "RED") {
 				matcher = rMatcher;
-			} else if (mainColor == "GREEN") {
-				matcher = gMatcher;
-			} else if (mainColor == "BLUE") {
-				matcher = bMatcher;
 			} else {
-				Log.d("TAG", "fail");
+				matcher = otherMatcher;
 			}
 			
+			Bitmap target = slicedImages[i];
 			HashMap<String, Number> result = matchImage(matcher, target);
 			
-			similarities[i] = (Float) result.get("similarity");
 			detectedTileIds[i] = advancedId2NormalId((Integer) result.get("id"), mainColor);
 			detectedTileNames[i] = idToName(detectedTileIds[i]);
+			similarities[i] = (Float) result.get("similarity");
+			
+			Log.d("TAG", "detected id:" + String.valueOf(result.get("id")) + "converted:" + String.valueOf(detectedTileIds[i]));
 		}
 		
 		long end = System.currentTimeMillis();
@@ -760,20 +696,19 @@ public class CaptureHelper {
 		return ret;
 	}
 	
-	// detect helpers
-	private double getEuclideanDistance(Bitmap src, Bitmap target) {
+	// detect helpers	
+	private double getEuclideanDistance(Bitmap target, Bitmap template) {
 		// check and convert resolution
 		int width = target.getWidth();
 		int height = target.getHeight();
 		
 		// change to same resolution
-		src = effectChangeResolution(src, width, height);
+		template = effectChangeResolution(template, width, height);
 		
 		// get pixels
-		int[] srcPixels = new int[width * height];
-		src.getPixels(srcPixels, 0, width, 0, 0, width, height);
-
+		int[] templatePixels = new int[width * height];
 		int[] targetPixels = new int[width * height];
+		template.getPixels(templatePixels, 0, width, 0, 0, width, height);
 		target.getPixels(targetPixels, 0, width, 0, 0, width, height);
 		
 		// calculate diff
@@ -788,26 +723,24 @@ public class CaptureHelper {
 		
 		for (int x = 0; x < width; x++) {
 			for (int y = 0; y < height; y++) {
-				try {
-					srcColor = srcPixels[x + y*width];
-					targetColor = targetPixels[x + y*height];
-					
-					rDiff = Color.red(srcColor) - Color.red(targetColor);
-					gDiff = Color.green(srcColor) - Color.green(targetColor);
-					bDiff = Color.blue(srcColor) - Color.blue(targetColor);
-					
-					rDiffSum += Math.pow(rDiff, 2);
-					rDiffSum += Math.pow(gDiff, 2);
-					rDiffSum += Math.pow(bDiff, 2);
-				} catch (Exception e) {
-				}
+				srcColor = templatePixels[x + y*width];
+				targetColor = targetPixels[x + y*width];
+				
+				rDiff = Color.red(srcColor) - Color.red(targetColor);
+				rDiffSum += Math.pow(rDiff, 2);
+				gDiff = Color.green(srcColor) - Color.green(targetColor);
+				gDiffSum += Math.pow(gDiff, 2);
+				bDiff = Color.blue(srcColor) - Color.blue(targetColor);
+				bDiffSum += Math.pow(bDiff, 2);
 			}
 		}
 		
-		double maxDiff = Math.sqrt(width * height * Math.pow(255, 2));
-		double denominator = 3 * maxDiff;
-		double numerator = Math.sqrt(rDiffSum) + Math.sqrt(gDiffSum) + Math.sqrt(bDiffSum);
-		double difference = numerator / denominator * 100;
+		double maxDiff, numerator, denominator, difference;
+		
+		maxDiff = Math.sqrt(width * height * Math.pow(255, 2));
+		denominator = 3 * maxDiff;
+		numerator = Math.sqrt(rDiffSum) + Math.sqrt(gDiffSum) + Math.sqrt(bDiffSum);
+		difference = numerator / denominator * 100;
 		
 		return difference; 
 	}
@@ -876,11 +809,9 @@ public class CaptureHelper {
 	
 	public void setMethod(int methodType) {
 		// clear current items
-		templateImageIds = null;
 		matcher = null;
 		rMatcher = null;
-		gMatcher = null;
-		bMatcher = null;
+		otherMatcher = null;
 		
 		this.methodType = methodType;
 		loadTemplates();
